@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neolingua Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="header">
+        <div class="brand-lockup">
+          <img
+            class="brand-logo"
+            src="/neolingua-logo.png"
+            width="88"
+            height="48"
+            alt=""
+          />
+          <h1 class="app-title">Neolingua Center</h1>
+        </div>
+      </header>
+      <div id="update-banner" class="update-banner" hidden></div>
+      <main class="main" id="main" aria-live="polite"></main>
+      <footer class="status-bar" id="status-bar" aria-label="État du salon">
+        <div class="status-bar-cluster status-bar-cluster--salon">
+          <span class="status-bar-server" title="État du serveur salon">
+            <span class="status-bar-server-dot" id="status-bar-server-dot" aria-hidden="true"></span>
+            <span class="status-bar-server-label" id="status-bar-server-label">Connexion…</span>
+          </span>
+          <div class="status-bar-chip" id="status-bar-url-chip">
+            <code class="status-bar-url-text" id="status-bar-url">…</code>
+            <button
+              type="button"
+              class="status-bar-icon-btn"
+              id="status-bar-copy-url"
+              title="Copier l’adresse"
+              aria-label="Copier l’adresse"
+            >
+              <svg
+                class="status-bar-action-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect
+                  x="9"
+                  y="9"
+                  width="11"
+                  height="11"
+                  rx="2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="status-bar-icon-btn"
+              id="status-bar-open-url"
+              title="Ouvrir dans le navigateur"
+              aria-label="Ouvrir dans le navigateur"
+            >
+              <svg
+                class="status-bar-action-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M14 3h7v7"
+                />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M10 14L21 3"
+                />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M21 14v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="status-bar-cluster status-bar-cluster--presence">
+          <span class="status-bar-dot" id="status-bar-dot" aria-hidden="true"></span>
+          <div class="status-bar-playback" id="status-bar-playback" role="status">
+            Aucune lecture
+          </div>
+        </div>
+        <div class="status-bar-cluster status-bar-cluster--meta">
+          <button
+            type="button"
+            class="status-bar-version"
+            id="status-bar-version"
+            title="Vérifier les mises à jour"
+            aria-label="Vérifier les mises à jour"
+            hidden
+          ></button>
+          <button
+            type="button"
+            class="status-bar-update"
+            id="status-bar-update"
+            hidden
+            title="Mise à jour disponible"
+            aria-label="Mise à jour disponible"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 16V4m0 0L8 8m4-4l4 4M5 20h14"
+              />
+            </svg>
+          </button>
+        </div>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

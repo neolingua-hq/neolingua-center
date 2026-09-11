@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neolingua</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/player-chrome-fs.css" />
+    <link rel="stylesheet" href="/jam.css" />
+  </head>
+  <body>
+    <div
+      id="connection-banner"
+      class="connection-banner"
+      role="alert"
+      aria-live="assertive"
+      hidden
+    >
+      <div class="connection-banner-inner">
+        <p class="connection-banner-text">
+          Connexion au serveur perdue.
+          <span id="connection-banner-countdown">Nouvelle tentative sous peu…</span>
+        </p>
+        <button type="button" class="connection-banner-retry" id="connection-banner-retry">
+          Réessayer
+        </button>
+      </div>
+    </div>
+    <div
+      id="connection-overlay"
+      class="connection-overlay"
+      hidden
+      aria-hidden="true"
+    ></div>
+    <div class="app">
+      <header class="header">
+        <a class="brand-lockup" href="/" data-home aria-label="Bibliothèque">
+          <img class="brand-logo" src="/neolingua-logo.png" width="72" height="40" alt="" />
+          <h1 class="app-title">Neolingua</h1>
+        </a>
+      </header>
+      <main class="main" id="main">
+        <p class="muted">Chargement de la bibliothèque…</p>
+      </main>
+    </div>
+    <script src="/qrcode.min.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "name": "neolingua-center",
+  "private": true,
+  "version": "1.0.0-beta.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "fetch-binaries": "node scripts/fetch-ffmpeg-binaries.mjs && node scripts/fetch-whisper-binaries.mjs",
+    "test": "vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "quality": "bash ../.cursor/skills/neo-quality/scripts/audit.sh",
+    "tauri": "tauri",
+    "publish-downloads": "node scripts/publish-downloads.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-opener": "^2.5.5",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  }
+}

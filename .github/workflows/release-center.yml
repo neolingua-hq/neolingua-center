@@ -1,0 +1,139 @@
+name: Release Neolingua Center
+
+on:
+  push:
+    tags:
+      # SemVer without "v" prefix (1.0.0, 1.0.0-beta.1). Not v1.0.0.
+      - "[0-9]*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-center:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin --bundles app,dmg
+            artifact: macos-aarch64
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin --bundles app,dmg
+            artifact: macos-x86_64
+          - platform: windows-latest
+            args: --bundles nsis
+            artifact: windows-x64
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('{0}', github.run_number) }}
+          releaseName: Neolingua Center ${{ github.ref_type == 'tag' && github.ref_name || format('{0}', github.run_number) }}
+          releaseBody: |
+            Installateurs et mises à jour automatiques pour Neolingua Center.
+            Première install : https://download.neolingua.app
+            L’app vérifie `latest.json` sur cette release pour les mises à jour.
+          releaseDraft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}
+
+      - name: Upload macOS DMG for R2
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.artifact }}
+          path: src-tauri/target/**/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+      - name: Upload Windows NSIS for R2
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.artifact }}
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  publish-r2:
+    needs: publish-center
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Pick macOS aarch64 DMG and Windows NSIS
+        id: pick
+        shell: bash
+        run: |
+          set -euo pipefail
+          find artifacts -type f | sort
+          dmg="$(find artifacts -type f -name '*.dmg' | grep -E 'aarch64|arm64' | head -n 1 || true)"
+          if [[ -z "$dmg" ]]; then
+            dmg="$(find artifacts -type f -name '*.dmg' | head -n 1 || true)"
+          fi
+          exe="$(find artifacts -type f -name '*.exe' | head -n 1 || true)"
+          echo "dmg=${dmg}" >> "$GITHUB_OUTPUT"
+          echo "exe=${exe}" >> "$GITHUB_OUTPUT"
+          [[ -n "$dmg" ]] || { echo "No DMG found"; exit 1; }
+
+      - name: Upload installers to R2 (S3 multipart)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          export AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}"
+          export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
+          export AWS_DEFAULT_REGION=auto
+          export AWS_EC2_METADATA_DISABLED=true
+          aws s3 cp "${{ steps.pick.outputs.dmg }}" \
+            "s3://neolingua-downloads/macos/latest.dmg" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type application/x-apple-diskimage
+          if [[ -n "${{ steps.pick.outputs.exe }}" ]]; then
+            aws s3 cp "${{ steps.pick.outputs.exe }}" \
+              "s3://neolingua-downloads/windows/latest.exe" \
+              --endpoint-url "${ENDPOINT}" \
+              --content-type application/octet-stream
+          fi

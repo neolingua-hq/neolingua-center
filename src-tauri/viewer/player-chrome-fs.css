@@ -1,0 +1,26 @@
+/**
+ * Shared fullscreen player-chrome look (Solo shell FS + Jam document FS).
+ * Selectors stay distinct in app.css / jam.css; tokens are shared here.
+ */
+
+:root {
+  --player-chrome-fs-fg: #f7f4ef;
+  --player-chrome-fs-fg-muted: rgba(247, 244, 239, 0.72);
+  --player-chrome-fs-pad: 1.1rem 1.25rem 1.25rem;
+  --player-chrome-fs-pad-jam: 0.85rem 1rem 1.1rem;
+  --player-chrome-fs-scrim: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.78),
+    rgba(0, 0, 0, 0.28) 70%,
+    transparent
+  );
+  --player-chrome-fs-scrim-jam: linear-gradient(to top, rgba(12, 11, 10, 0.82), transparent);
+  --player-chrome-fs-btn-bg: rgba(255, 255, 255, 0.08);
+  --player-chrome-fs-btn-border: rgba(255, 255, 255, 0.22);
+  --player-chrome-fs-active-bg: rgba(196, 92, 38, 0.35);
+  --player-chrome-fs-active-border: #e08a55;
+  --player-chrome-fs-active-fg: #f7d3bc;
+  --player-chrome-fs-transition: opacity 220ms ease, transform 220ms ease;
+  --player-chrome-fs-hide-shift: 0.35rem;
+  --player-chrome-fs-hide-shift-jam: 0.6rem;
+}
