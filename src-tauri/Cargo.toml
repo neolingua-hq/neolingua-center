@@ -24,7 +24,7 @@ axum = { version = "0.8", features = ["ws"] }
 futures = "0.3"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 # Stay on 0.6: axum 0.8 is not on tower-http 0.7 yet.
-tower-http = { version = "0.6", features = ["cors", "fs"], default-features = false }
+tower-http = { version = "0.7", features = ["cors", "fs"], default-features = false }
 regex = "1"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls"] }
 tauri-plugin-clipboard-manager = "2"
