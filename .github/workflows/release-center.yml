@@ -18,12 +18,15 @@ jobs:
         include:
           - platform: macos-latest
             args: --target aarch64-apple-darwin --bundles app,dmg
+            triple: aarch64-apple-darwin
             artifact: macos-aarch64
           - platform: macos-latest
             args: --target x86_64-apple-darwin --bundles app,dmg
+            triple: x86_64-apple-darwin
             artifact: macos-x86_64
           - platform: windows-latest
             args: --bundles nsis
+            triple: x86_64-pc-windows-msvc
             artifact: windows-x64
 
     runs-on: ${{ matrix.platform }}
@@ -45,6 +48,13 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      # beforeBuildCommand only fetches the host triple; cross builds (Intel on
+      # arm64 runners) need the target sidecars explicitly.
+      - name: Fetch sidecars for target triple
+        run: |
+          node scripts/fetch-ffmpeg-binaries.mjs ${{ matrix.triple }}
+          node scripts/fetch-whisper-binaries.mjs ${{ matrix.triple }}
 
       - name: Import Apple Developer ID certificate
         if: runner.os == 'macOS'
@@ -117,6 +127,8 @@ jobs:
 
   publish-r2:
     needs: publish-center
+    # Publish whatever installers succeeded (do not block on one matrix leg).
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +144,8 @@ jobs:
           pattern: installer-*
           path: artifacts
           merge-multiple: true
+          # Some matrix legs may have failed (no artifact for that OS).
+        continue-on-error: true
 
       - name: Pick macOS aarch64 DMG and Windows NSIS
         id: pick

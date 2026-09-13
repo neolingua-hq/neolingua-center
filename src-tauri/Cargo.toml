@@ -1,6 +1,6 @@
 [package]
 name = "neolingua-center"
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.3"
 description = "Neolingua Center - family host"
 authors = ["Neolingua"]
 edition = "2021"

@@ -140,11 +140,52 @@ function buildCli(triple) {
     stdio: "inherit",
     shell: true,
   });
-  const built = path.join(build, "bin", process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli");
-  if (!existsSync(built)) {
-    throw new Error(`whisper-cli build missing at ${built}`);
+  const built = findBuiltCli(build);
+  if (!built) {
+    throw new Error(
+      `whisper-cli build missing under ${build} (checked bin/, bin/Release/, Release/, examples/cli/)`,
+    );
   }
   return built;
+}
+
+/** Locate whisper-cli after cmake --build (Unix single-config vs MSVC multi-config). */
+function findBuiltCli(build) {
+  const exe = process.platform === "win32" ? "whisper-cli.exe" : "whisper-cli";
+  const candidates = [
+    path.join(build, "bin", exe),
+    path.join(build, "bin", "Release", exe),
+    path.join(build, "bin", "Debug", exe),
+    path.join(build, "Release", exe),
+    path.join(build, "Debug", exe),
+    path.join(build, "examples", "cli", "Release", exe),
+    path.join(build, "examples", "cli", exe),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate) && statSync(candidate).size >= CLI_MIN_BYTES) {
+      return candidate;
+    }
+  }
+  // Last resort: shallow walk under build/ for the executable name.
+  try {
+    const listed = execSync(
+      process.platform === "win32"
+        ? `powershell -NoProfile -Command "Get-ChildItem -Path ${JSON.stringify(build)} -Recurse -Filter ${JSON.stringify(exe)} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName"`
+        : `find ${JSON.stringify(build)} -name ${JSON.stringify(exe)} -type f 2>/dev/null`,
+      { encoding: "utf8" },
+    )
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    for (const hit of listed) {
+      if (existsSync(hit) && statSync(hit).size >= CLI_MIN_BYTES) {
+        return hit;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 async function ensureWhisperCli(triple) {
