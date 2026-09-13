@@ -162,6 +162,13 @@ jobs:
           echo "exe=${exe}" >> "$GITHUB_OUTPUT"
           [[ -n "$dmg" ]] || { echo "No DMG found"; exit 1; }
 
+      - name: Publish Whisper model to R2 if missing
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: node scripts/publish-whisper-model.mjs
+
       - name: Upload installers to R2 (S3 multipart)
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

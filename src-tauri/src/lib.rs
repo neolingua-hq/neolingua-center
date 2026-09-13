@@ -9,6 +9,7 @@ mod scan;
 mod server;
 mod tmdb;
 mod watcher;
+mod whisper_model;
 
 use cache::{EpisodePrep, PrepRegistry};
 use db::{with_connection, AppSettings, DbState, MediaRoot};
@@ -120,11 +121,10 @@ async fn check_library(
         let db = state.lock().map_err(|e| e.to_string())?;
         db.path.clone()
     };
-    let (mut snap, changed) = tauri::async_runtime::spawn_blocking(move || {
-        library::sync_catalog_at(&path, false)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+    let (mut snap, changed) =
+        tauri::async_runtime::spawn_blocking(move || library::sync_catalog_at(&path, false))
+            .await
+            .map_err(|e| e.to_string())??;
     enrich_prep(&mut snap, &prep);
     if changed {
         let _ = app.emit("library-updated", ());

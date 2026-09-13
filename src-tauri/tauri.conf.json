@@ -39,7 +39,6 @@
       "binaries/whisper-cli"
     ],
     "resources": {
-      "resources/whisper/": "whisper/",
       "viewer/": "viewer/"
     },
     "macOS": {

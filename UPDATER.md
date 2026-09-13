@@ -13,6 +13,9 @@ to GitHub Releases together with a static `latest.json` manifest.
 The GitHub repository itself is managed by Terraform (same pattern as Vesta / TTR /
 Deescover): see `../infrastructure/github/`.
 
+The Whisper model is **not** part of the updater payload. It lives in app data and
+is downloaded once from `download.neolingua.app/whisper/ggml-small.bin`.
+
 Configured endpoint:
 
 `https://github.com/neolingua-hq/neolingua-center/releases/latest/download/latest.json`

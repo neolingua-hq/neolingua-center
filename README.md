@@ -8,11 +8,12 @@ Hôte familial Neolingua : configuration locale, serveur embarqué (étapes suiv
 - Rust (rustup)
 - macOS ou Windows (cibles V1)
 
-Les outils de conversion (`ffmpeg` / `ffprobe`) et la transcription (`whisper-cli` +
-modèle `ggml-small`) sont **embarqués** dans l'app.
-Au premier `tauri dev` / `tauri build`, `npm run fetch-binaries` les télécharge
-dans `src-tauri/binaries/` et `src-tauri/resources/whisper/` (ignorés par git).
-Le modèle Whisper pèse ~465 Mo.
+Les outils de conversion (`ffmpeg` / `ffprobe`) et `whisper-cli` sont
+**embarqués** dans l'app. Au premier `tauri dev` / `tauri build`,
+`npm run fetch-binaries` les télécharge dans `src-tauri/binaries/` (ignorés par
+git). Le modèle de transcription (`ggml-small.bin`, ~465 Mo) n'est **pas** dans
+l'installateur : il est téléchargé une fois dans les données de l'app, au premier
+épisode qui a vraiment besoin d'une transcription.
 
 ## Développement
 
@@ -37,7 +38,8 @@ Au premier lancement, l'assistant de configuration s'ouvre. Les choix sont persi
 
 | Commande | Description |
 |----------|-------------|
-| `npm run fetch-binaries` | Télécharge ffmpeg/ffprobe/whisper-cli + modèle ggml-small |
+| `npm run fetch-binaries` | Télécharge ffmpeg/ffprobe/whisper-cli (pas le modèle) |
+| `npm run publish-whisper-model` | Publie `ggml-small.bin` sur R2 s'il n'y est pas déjà |
 | `npm run dev` | Vite seul (port 1422) |
 | `npm run tauri dev` | App desktop + hot reload |
 | `npm run tauri build` | Build release (DMG sur macOS, NSIS `.exe` sur Windows) |

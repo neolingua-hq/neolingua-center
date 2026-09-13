@@ -60,8 +60,10 @@ cp -R "src-tauri/target/release/bundle/macos/Neolingua Center.app" "/Application
 
 ## 4. Publish first-install binaries to R2
 
-The DMG is larger than wrangler's ~300 MiB CLI limit, so uploads use the **R2 S3
-API** (multipart via `aws s3 cp`).
+Installers no longer embed the transcription model. Expected DMG / NSIS size is
+around 50 MB. The model is a separate immutable object:
+
+`https://download.neolingua.app/whisper/ggml-small.bin`
 
 Create an R2 API token once (Object Read & Write on `neolingua-downloads`):
 
@@ -86,25 +88,30 @@ R2_ACCESS_KEY_ID=…
 R2_SECRET_ACCESS_KEY=…
 ```
 
-Publish (script local, non versionné : `scripts/publish-downloads.mjs`) :
+Publish installers (script local, non versionné : `scripts/publish-downloads.mjs`)
+and the model if R2 does not already have the expected file:
 
 ```bash
 npm run publish-downloads
+npm run publish-whisper-model
 ```
 
 Writes:
 
 - `macos/neolingua-latest.dmg` + versioned copy
 - `windows/neolingua-latest.exe` + versioned copy (if an NSIS build is present)
+- `whisper/ggml-small.bin` (skipped when the object size already matches)
 
 Smoke:
 
 ```bash
 curl -sI https://download.neolingua.app/macos/neolingua-latest.dmg | head
 curl -sI https://download.neolingua.app/windows/neolingua-latest.exe | head
+curl -sI https://download.neolingua.app/whisper/ggml-small.bin | head
 ```
 
-Content-Length must be a real installer size (not a ~35 byte stub).
+Content-Length must be a real installer size (not a ~35 byte stub). The model
+must be 487601967 bytes.
 
 ## 5. GitHub release (updater)
 
@@ -115,6 +122,7 @@ When the GitHub repo and secrets are ready:
 3. Workflow `.github/workflows/release-center.yml` builds platforms and uploads
    `latest.json` via `tauri-action`
 4. The same workflow uploads `neolingua-latest.dmg` / `neolingua-latest.exe` to R2
+   and publishes `whisper/ggml-small.bin` if it is not already on the bucket
 
 Secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
 `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.

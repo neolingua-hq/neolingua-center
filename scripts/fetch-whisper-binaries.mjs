@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Bundle whisper.cpp CLI + ggml model for Tauri (no Homebrew / Python at runtime).
+ * Bundle whisper.cpp CLI for Tauri (no Homebrew / Python at runtime).
+ *
+ * The ggml model is downloaded at runtime into app data, not into the installer.
  *
  * - macOS: build a mostly-static whisper-cli (Metal, no OpenMP) from a pinned tag
  * - Linux / Windows: build from source when cmake is available; otherwise download
  *   official release archives (shared libs must sit beside the CLI)
- * - Model: ggml-small.bin as a Tauri resource
  */
 import { execSync } from "node:child_process";
 import {
   chmodSync,
-  createWriteStream,
   existsSync,
   mkdirSync,
   copyFileSync,
@@ -18,17 +18,10 @@ import {
   statSync,
 } from "node:fs";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 /** Prefer a recent whisper.cpp tip; rebuild when models fail to load. */
 const WHISPER_REF = "master";
-const MODEL_NAME = "ggml-small.bin";
-const MODEL_URL =
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
-/** Exact Hugging Face Content-Length for ggml-small.bin */
-const MODEL_EXPECTED_BYTES = 487_601_967;
 const CLI_MIN_BYTES = 500_000;
 
 const ROOT = path.join(
@@ -37,7 +30,6 @@ const ROOT = path.join(
   "src-tauri",
 );
 const BINARIES = path.join(ROOT, "binaries");
-const RESOURCES = path.join(ROOT, "resources", "whisper");
 const BUILD_DIR = path.join(BINARIES, ".whisper-src");
 
 function hostTriple() {
@@ -53,14 +45,6 @@ function adhocSign(filePath) {
   } catch {
     // Unsigned local builds still work for development.
   }
-}
-
-async function downloadFile(url, dest) {
-  const res = await fetch(url, { redirect: "follow" });
-  if (!res.ok || !res.body) {
-    throw new Error(`Download failed ${url} (${res.status})`);
-  }
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(dest));
 }
 
 function hasCmake() {
@@ -204,32 +188,9 @@ async function ensureWhisperCli(triple) {
   console.log(`wrote ${outName} (${Math.round(statSync(out).size / 1e6)} MB)`);
 }
 
-async function ensureModel() {
-  mkdirSync(RESOURCES, { recursive: true });
-  const dest = path.join(RESOURCES, MODEL_NAME);
-  if (existsSync(dest) && statSync(dest).size === MODEL_EXPECTED_BYTES) {
-    console.log(`ok ${MODEL_NAME}`);
-    return;
-  }
-  console.log(`fetch ${MODEL_NAME} (~465 MB)`);
-  const partial = `${dest}.partial`;
-  await downloadFile(MODEL_URL, partial);
-  const size = existsSync(partial) ? statSync(partial).size : 0;
-  if (size !== MODEL_EXPECTED_BYTES) {
-    rmSync(partial, { force: true });
-    throw new Error(
-      `Model download size mismatch: got ${size}, expected ${MODEL_EXPECTED_BYTES}`,
-    );
-  }
-  copyFileSync(partial, dest);
-  rmSync(partial, { force: true });
-  console.log(`wrote ${MODEL_NAME} (${Math.round(statSync(dest).size / 1e6)} MB)`);
-}
-
 mkdirSync(BINARIES, { recursive: true });
 const wanted = process.argv.slice(2);
 const triples = wanted.length > 0 ? wanted : [hostTriple()];
 for (const triple of triples) {
   await ensureWhisperCli(triple);
 }
-await ensureModel();

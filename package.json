@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "fetch-binaries": "node scripts/fetch-ffmpeg-binaries.mjs && node scripts/fetch-whisper-binaries.mjs",
+    "publish-whisper-model": "node scripts/publish-whisper-model.mjs",
     "test": "vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
     "test:unit": "vitest run",
     "test:watch": "vitest",

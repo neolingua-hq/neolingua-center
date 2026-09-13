@@ -11,6 +11,26 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Hide the child console on Windows (ffmpeg/ffprobe/whisper are console apps).
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+fn command_hidden(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new(program);
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new(program)
+    }
+}
+
 /// Returned by prepare steps when the user cancels mid-job.
 const CANCELLED_MSG: &str = "__cancelled__";
 
@@ -101,6 +121,7 @@ fn constitution_message(en_source: &str, fr_source: &str) -> String {
 }
 
 pub struct PrepRegistry {
+    app_data_dir: PathBuf,
     cache_dir: PathBuf,
     jobs: Mutex<HashMap<String, EpisodePrep>>,
     work: Mutex<()>,
@@ -116,6 +137,7 @@ impl PrepRegistry {
         let _ = fs::create_dir_all(cache_dir.join("video"));
         let _ = fs::create_dir_all(cache_dir.join("subs"));
         Self {
+            app_data_dir,
             cache_dir,
             jobs: Mutex::new(HashMap::new()),
             work: Mutex::new(()),
@@ -170,7 +192,18 @@ impl PrepRegistry {
         let Some(pid) = pid else {
             return;
         };
-        let _ = Command::new("kill").args(["-TERM", &pid.to_string()]).status();
+        #[cfg(unix)]
+        {
+            let _ = Command::new("kill")
+                .args(["-TERM", &pid.to_string()])
+                .status();
+        }
+        #[cfg(windows)]
+        {
+            let _ = command_hidden("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .status();
+        }
     }
 
     /// Request cancel for a queued or in-progress prep. Purges cache when the job stops.
@@ -215,10 +248,7 @@ impl PrepRegistry {
     pub fn inspect(&self, media_path: &str) -> EpisodePrep {
         if let Ok(jobs) = self.jobs.lock() {
             if let Some(job) = jobs.get(media_path) {
-                if job.status == "processing"
-                    || job.status == "queued"
-                    || job.status == "error"
-                {
+                if job.status == "processing" || job.status == "queued" || job.status == "error" {
                     return job.clone();
                 }
             }
@@ -299,7 +329,8 @@ impl PrepRegistry {
     }
 
     pub fn total_bytes(&self) -> u64 {
-        dir_total_bytes(&self.cache_dir.join("video")) + dir_total_bytes(&self.cache_dir.join("subs"))
+        dir_total_bytes(&self.cache_dir.join("video"))
+            + dir_total_bytes(&self.cache_dir.join("subs"))
     }
 
     /// Delete oldest cache groups until total size is under `max_bytes`.
@@ -747,10 +778,7 @@ fn write_sub_source(cache_dir: &Path, media_path: &str, lang: &str, source: &str
     }
 }
 
-fn resolve_track_source(
-    has_file: bool,
-    recorded: Option<&str>,
-) -> String {
+fn resolve_track_source(has_file: bool, recorded: Option<&str>) -> String {
     if !has_file {
         return SUB_SOURCE_MISSING.into();
     }
@@ -913,12 +941,8 @@ where
         (true, false, Some("fr"), _) => {
             "Pas de sous-titres français (Whisper a échoué ou est indisponible)."
         }
-        (false, true, _, _) => {
-            "Pas de sous-titres anglais dans le fichier (français trouvé)."
-        }
-        (true, false, _, _) => {
-            "Pas de sous-titres français dans le fichier (anglais trouvé)."
-        }
+        (false, true, _, _) => "Pas de sous-titres anglais dans le fichier (français trouvé).",
+        (true, false, _, _) => "Pas de sous-titres français dans le fichier (anglais trouvé).",
         (false, false, None, None) => {
             "Langue originale inconnue (TMDB). Impossible de générer les sous-titres."
         }
@@ -937,9 +961,12 @@ fn reject_unreadable_source(source: &Path) -> Result<(), String> {
     if meta.len() == 0 {
         return Err("Fichier source vide.".into());
     }
-    let mut file = fs::File::open(source).map_err(|e| format!("Impossible d’ouvrir le fichier : {e}"))?;
+    let mut file =
+        fs::File::open(source).map_err(|e| format!("Impossible d’ouvrir le fichier : {e}"))?;
     let mut buf = [0u8; 64];
-    let n = file.read(&mut buf).map_err(|e| format!("Impossible de lire le fichier : {e}"))?;
+    let n = file
+        .read(&mut buf)
+        .map_err(|e| format!("Impossible de lire le fichier : {e}"))?;
     if n == 0 || buf[..n].iter().all(|&b| b == 0) {
         return Err(
             "Fichier source corrompu ou incomplet (données vides). Remplacez le fichier média."
@@ -1001,42 +1028,27 @@ where
             recorded.en.as_deref()
         };
         if existing.is_none() {
-            write_sub_source(
-                &registry.cache_dir,
-                media_path,
-                lang,
-                SUB_SOURCE_NATIVE,
-            );
+            write_sub_source(&registry.cache_dir, media_path, lang, SUB_SOURCE_NATIVE);
         }
         return Ok(());
     }
 
     if let Some(sidecar) = find_sidecar_sub(source, lang) {
         convert_sub_to_vtt(&sidecar, &out)?;
-        write_sub_source(
-            &registry.cache_dir,
-            media_path,
-            lang,
-            SUB_SOURCE_NATIVE,
-        );
+        write_sub_source(&registry.cache_dir, media_path, lang, SUB_SOURCE_NATIVE);
         return Ok(());
     }
 
     if let Some(index) = probe_subtitle_index(source, lang)? {
         extract_embedded_sub(source, &out, index)?;
-        write_sub_source(
-            &registry.cache_dir,
-            media_path,
-            lang,
-            SUB_SOURCE_NATIVE,
-        );
+        write_sub_source(&registry.cache_dir, media_path, lang, SUB_SOURCE_NATIVE);
         return Ok(());
     }
 
     // Whisper for the original language, or for the secondary when a matching
     // audio track exists (e.g. MULTi with a French dub but no FR subtitles).
-    let whisper_secondary = original_track != Some(lang)
-        && probe_audio_index_matching_lang(source, lang)?.is_some();
+    let whisper_secondary =
+        original_track != Some(lang) && probe_audio_index_matching_lang(source, lang)?.is_some();
     if original_track == Some(lang) || whisper_secondary {
         let disk = inspect_disk(&registry.cache_dir, media_path);
         notify_progress(
@@ -1044,9 +1056,9 @@ where
             media_path,
             82,
             if whisper_secondary {
-                "Transcription Whisper (piste audio)…"
+                "Transcription (piste audio)…"
             } else {
-                "Transcription Whisper…"
+                "Transcription des sous-titres…"
             },
             PrepTrackFlags {
                 video: true,
@@ -1056,13 +1068,8 @@ where
             on_update,
         );
         registry.ensure_not_cancelled(media_path)?;
-        transcribe_with_whisper(registry, media_path, source, &out, lang)?;
-        write_sub_source(
-            &registry.cache_dir,
-            media_path,
-            lang,
-            SUB_SOURCE_GENERATED,
-        );
+        transcribe_with_whisper(registry, media_path, source, &out, lang, on_update)?;
+        write_sub_source(&registry.cache_dir, media_path, lang, SUB_SOURCE_GENERATED);
         return Ok(());
     }
 
@@ -1078,35 +1085,57 @@ fn whisper_cli_bin() -> Result<&'static Path, String> {
     }
 }
 
-fn find_whisper_model() -> Result<PathBuf, String> {
-    const NAME: &str = "ggml-small.bin";
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            // macOS: Contents/Resources/whisper (mapped resource)
-            candidates.push(dir.join("../Resources/whisper").join(NAME));
-            // Legacy layout from older bundles (resources/whisper/* → Resources/resources/…)
-            candidates.push(dir.join("../Resources/resources/whisper").join(NAME));
-            // Windows / flat layouts next to the executable
-            candidates.push(dir.join("resources/whisper").join(NAME));
-            candidates.push(dir.join("whisper").join(NAME));
-        }
+fn ensure_whisper_model<F>(
+    registry: &PrepRegistry,
+    media_path: &str,
+    on_update: &mut F,
+) -> Result<PathBuf, String>
+where
+    F: FnMut(&EpisodePrep),
+{
+    let spec = crate::whisper_model::ModelSpec::production();
+    let dest = crate::whisper_model::model_path(&registry.app_data_dir, &spec);
+    if crate::whisper_model::is_complete_model(&dest, spec.expected_bytes) {
+        return Ok(dest);
     }
-    // Development: crate resources next to Cargo.toml
-    candidates.push(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources")
-            .join("whisper")
-            .join(NAME),
-    );
-    for candidate in &candidates {
-        if candidate.is_file() {
-            return Ok(candidate.canonicalize().unwrap_or_else(|_| candidate.clone()));
-        }
-    }
-    Err(
-        "Modèle Whisper manquant dans l'application (ggml-small.bin). Réinstallez Neolingua Center."
-            .into(),
+
+    let disk = inspect_disk(&registry.cache_dir, media_path);
+    let mut last_pct: i16 = -1;
+    crate::whisper_model::ensure_model(
+        &registry.app_data_dir,
+        &spec,
+        || registry.is_cancelled(media_path),
+        |downloaded, total| {
+            let pct = if total > 0 {
+                ((downloaded as f64 / total as f64) * 100.0).clamp(0.0, 99.0) as u8
+            } else {
+                0
+            };
+            if i16::from(pct) < last_pct + 2 && downloaded < total {
+                return;
+            }
+            last_pct = i16::from(pct);
+            let overall = 78 + (u16::from(pct) * 8 / 100) as u8;
+            let downloaded_mb = downloaded / 1_000_000;
+            let total_mb = total / 1_000_000;
+            let message = if total > 0 {
+                format!("Téléchargement du modèle de sous-titres… {downloaded_mb} / {total_mb} Mo")
+            } else {
+                "Téléchargement du modèle de sous-titres…".into()
+            };
+            notify_progress(
+                registry,
+                media_path,
+                overall,
+                &message,
+                PrepTrackFlags {
+                    video: true,
+                    en_source: disk.en_source.clone(),
+                    fr_source: disk.fr_source.clone(),
+                },
+                on_update,
+            );
+        },
     )
 }
 
@@ -1127,10 +1156,7 @@ fn probe_audio_index_matching_lang(source: &Path, lang: &str) -> Result<Option<u
             continue;
         }
         let tag = stream_lang(&stream);
-        if prefixes
-            .iter()
-            .any(|p| tag == *p || tag.starts_with(p))
-        {
+        if prefixes.iter().any(|p| tag == *p || tag.starts_with(p)) {
             if let Some(index) = stream.get("index").and_then(|i| i.as_u64()) {
                 return Ok(Some(index as usize));
             }
@@ -1158,16 +1184,34 @@ fn probe_audio_index_for_lang(source: &Path, lang: &str) -> Result<usize, String
         .ok_or_else(|| "Index audio invalide".into())
 }
 
-fn transcribe_with_whisper(
+fn transcribe_with_whisper<F>(
     registry: &PrepRegistry,
     media_path: &str,
     source: &Path,
     out: &Path,
     lang: &str,
-) -> Result<(), String> {
+    on_update: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&EpisodePrep),
+{
     registry.ensure_not_cancelled(media_path)?;
     let cli = whisper_cli_bin()?;
-    let model = find_whisper_model()?;
+    let model = ensure_whisper_model(registry, media_path, on_update)?;
+    registry.ensure_not_cancelled(media_path)?;
+    let disk = inspect_disk(&registry.cache_dir, media_path);
+    notify_progress(
+        registry,
+        media_path,
+        88,
+        "Transcription des sous-titres…",
+        PrepTrackFlags {
+            video: true,
+            en_source: disk.en_source,
+            fr_source: disk.fr_source,
+        },
+        on_update,
+    );
     fs::create_dir_all(out.parent().unwrap_or(Path::new("."))).map_err(|e| e.to_string())?;
 
     let audio_index = probe_audio_index_for_lang(source, lang)?;
@@ -1191,7 +1235,7 @@ fn transcribe_with_whisper(
     ])?;
     registry.ensure_not_cancelled(media_path)?;
 
-    let mut child = Command::new(cli)
+    let mut child = command_hidden(cli)
         .args([
             "-m",
             &model.to_string_lossy(),
@@ -1239,7 +1283,16 @@ fn transcribe_with_whisper(
     }
     let _ = fs::remove_file(&wav);
     if !status.success() {
-        let tip = stderr.trim().lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+        let tip = stderr
+            .trim()
+            .lines()
+            .rev()
+            .take(8)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
         let _ = fs::remove_file(&vtt_out);
         return Err(if tip.is_empty() {
             format!("Whisper a échoué (code {:?}).", status.code())
@@ -1360,7 +1413,7 @@ where
     let source_str = source.to_string_lossy().into_owned();
     let audio_map = format!("0:{audio_index}");
 
-    let mut child = Command::new(ffmpeg_bin()?)
+    let mut child = command_hidden(ffmpeg_bin()?)
         .args([
             "-y",
             "-i",
@@ -1470,7 +1523,7 @@ where
 }
 
 fn probe_duration_seconds(source: &Path) -> Option<f64> {
-    let output = Command::new(ffprobe_bin().ok()?)
+    let output = command_hidden(ffprobe_bin().ok()?)
         .args([
             "-v",
             "quiet",
@@ -1499,7 +1552,7 @@ fn probe_duration_seconds(source: &Path) -> Option<f64> {
 }
 
 fn probe_streams(source: &Path) -> Result<Vec<Value>, String> {
-    let output = Command::new(ffprobe_bin()?)
+    let output = command_hidden(ffprobe_bin()?)
         .args([
             "-v",
             "error",
@@ -1518,8 +1571,8 @@ fn probe_streams(source: &Path) -> Result<Vec<Value>, String> {
             tip
         });
     }
-    let parsed: Value =
-        serde_json::from_slice(&output.stdout).map_err(|e| format!("Analyse média invalide : {e}"))?;
+    let parsed: Value = serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("Analyse média invalide : {e}"))?;
     Ok(parsed
         .get("streams")
         .and_then(|s| s.as_array())
@@ -1568,10 +1621,7 @@ fn probe_subtitle_index(source: &Path, lang: &str) -> Result<Option<usize>, Stri
             continue;
         }
         let tag = stream_lang(&stream);
-        if prefixes
-            .iter()
-            .any(|p| tag == *p || tag.starts_with(p))
-        {
+        if prefixes.iter().any(|p| tag == *p || tag.starts_with(p)) {
             if let Some(index) = stream.get("index").and_then(|i| i.as_u64()) {
                 return Ok(Some(index as usize));
             }
@@ -1581,7 +1631,7 @@ fn probe_subtitle_index(source: &Path, lang: &str) -> Result<Option<usize>, Stri
 }
 
 fn run_ffmpeg(args: &[&str]) -> Result<(), String> {
-    let output = Command::new(ffmpeg_bin()?)
+    let output = command_hidden(ffmpeg_bin()?)
         .args(args)
         .output()
         .map_err(|e| format!("Impossible de lancer la conversion : {e}"))?;
@@ -1636,10 +1686,7 @@ mod tests {
             SUB_SOURCE_GENERATED
         );
         assert_eq!(resolve_track_source(true, None), SUB_SOURCE_NATIVE);
-        assert_eq!(
-            resolve_track_source(true, Some("weird")),
-            SUB_SOURCE_NATIVE
-        );
+        assert_eq!(resolve_track_source(true, Some("weird")), SUB_SOURCE_NATIVE);
     }
 
     #[test]
@@ -1674,4 +1721,3 @@ mod tests {
         assert_eq!(stream_lang(&serde_json::json!({})), "");
     }
 }
-
