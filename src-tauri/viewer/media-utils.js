@@ -78,21 +78,49 @@ export function parseVtt(raw) {
 }
 
 /**
- * Detect intro range from early subtitle gaps (cold open + theme, or theme at 0).
- * @param {{ start: number, end: number }[]} cues
- * @returns {{ start: number, end: number }}
+ * True when a cue looks like spoken dialogue (not SDH / SFX / music-only).
+ * Cues without text (timing-only fixtures) count as dialogue.
+ * @param {{ text?: string } | null | undefined} cue
+ */
+export function isDialogueCue(cue) {
+  if (!cue || typeof cue.text !== "string") return true;
+  const raw = cue.text.trim();
+  if (!raw) return false;
+
+  // Entirely SDH / parenthetical / music markers.
+  if (/^\[.*\]$/s.test(raw)) return false;
+  if (/^\(.*\)$/s.test(raw)) return false;
+  if (/^[♪♫*].*/.test(raw) && !/[A-Za-zÀ-ÿ]{3,}/.test(raw.replace(/[♪♫*]/g, ""))) {
+    return false;
+  }
+
+  const cleaned = raw
+    .replace(/\[[^\]]*]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[♪♫*]/g, "")
+    .trim();
+  if (!cleaned) return false;
+  // Ellipsis / punctuation-only placeholders.
+  if (/^[.…]+$/.test(cleaned)) return false;
+  return true;
+}
+
+/**
+ * Detect intro range from early *dialogue* gaps (cold open + theme, or theme at 0).
+ * Returns null when no confident theme-length silence is found (never invents a skip).
+ * @param {{ start: number, end: number, text?: string }[]} cues
+ * @returns {{ start: number, end: number } | null}
  */
 export function detectIntroRangeSeconds(cues) {
   const INTRO_MIN = 35;
   const INTRO_MAX = 75;
   const SEARCH_WINDOW = 8 * 60;
-  const FALLBACK = 50;
 
-  const early = cues.filter((c) => c.start <= SEARCH_WINDOW);
+  const early = cues.filter((c) => c.start <= SEARCH_WINDOW && isDialogueCue(c));
+  if (early.length === 0) return null;
+
   /** @type {{ start: number, end: number, duration: number }[]} */
   const candidates = [];
-
-  if (early.length === 0) return { start: 0, end: FALLBACK };
 
   const beforeFirst = early[0].start;
   if (beforeFirst >= INTRO_MIN && beforeFirst <= INTRO_MAX) {
@@ -108,37 +136,18 @@ export function detectIntroRangeSeconds(cues) {
     }
   }
 
-  if (candidates.length > 0) {
-    const best = candidates.sort((a, b) => b.duration - a.duration)[0];
-    return { start: best.start, end: best.end };
-  }
+  if (candidates.length === 0) return null;
 
-  let bestStart = 0;
-  let bestEnd = Math.min(beforeFirst || FALLBACK, FALLBACK);
-  let bestDuration = bestEnd;
-
-  for (let i = 1; i < early.length; i += 1) {
-    const start = early[i - 1].end;
-    const end = early[i].start;
-    const duration = end - start;
-    if (duration > bestDuration) {
-      bestDuration = duration;
-      bestStart = start;
-      bestEnd = end;
-    }
-  }
-
-  if (beforeFirst > bestDuration) {
-    return { start: 0, end: beforeFirst };
-  }
-  return { start: bestStart, end: bestEnd };
+  const best = candidates.sort((a, b) => b.duration - a.duration)[0];
+  return { start: best.start, end: best.end };
 }
 
 /**
  * Detect intro end from early subtitle gaps.
- * @param {{ start: number, end: number }[]} cues
- * @returns {number}
+ * @param {{ start: number, end: number, text?: string }[]} cues
+ * @returns {number | null}
  */
 export function detectIntroEndSeconds(cues) {
-  return detectIntroRangeSeconds(cues).end;
+  const range = detectIntroRangeSeconds(cues);
+  return range ? range.end : null;
 }

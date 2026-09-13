@@ -61,6 +61,8 @@ let purgeCacheAfterWatch = false;
 let introStartSeconds = null;
 /** @type {number | null} */
 let introEndSeconds = null;
+/** Auto-skip runs at most once per watch; manual seek into intro stays allowed. */
+let introAutoSkipped = false;
 /** Request fullscreen on next watch boot (user gesture). */
 let pendingFullscreen = false;
 let scrubbing = false;
@@ -1640,6 +1642,7 @@ async function bootPlayer() {
 
   introStartSeconds = null;
   introEndSeconds = null;
+  introAutoSkipped = false;
   scrubbing = false;
   skipIntroBtn.hidden = true;
   applySubtitleSizes();
@@ -1888,14 +1891,16 @@ function skipIntro(player) {
 }
 
 /**
- * Auto-skip only once playback reaches the intro window (keeps cold opens).
+ * Auto-skip once when playback first enters the intro window (keeps cold opens).
+ * After that, seeking back into the intro is allowed (manual skip still works).
  * @param {HTMLVideoElement} player
  * @param {number} time
  */
 function maybeAutoSkipIntro(player, time) {
-  if (!autoSkipIntro) return;
+  if (!autoSkipIntro || introAutoSkipped) return;
   if (introStartSeconds == null || introEndSeconds == null) return;
   if (time < introStartSeconds || time >= introEndSeconds - 0.25) return;
+  introAutoSkipped = true;
   skipIntro(player);
 }
 
@@ -1912,8 +1917,8 @@ function updateSkipIntroVisibility(time, btn) {
 function applyIntroFromCues() {
   const cues = cuesEn.length ? cuesEn : cuesFr;
   const range = detectIntroRangeSeconds(cues);
-  introStartSeconds = range.start;
-  introEndSeconds = range.end;
+  introStartSeconds = range ? range.start : null;
+  introEndSeconds = range ? range.end : null;
 }
 
 async function requestFullscreen(el) {

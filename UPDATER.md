@@ -65,7 +65,7 @@ See [RELEASE.md](RELEASE.md) for the full checklist (R2 first-install + GitHub u
    - macOS `x86_64`
    - Windows NSIS (setup `.exe` + `.sig`)
 4. `tauri-action` merges platforms into `latest.json` on the release.
-5. A follow-up job uploads `macos/latest.dmg` and `windows/latest.exe` to R2.
+5. A follow-up job uploads `macos/neolingua-latest.dmg` and `windows/neolingua-latest.exe` to R2.
 
 ## Manual local sign (optional)
 
@@ -88,9 +88,14 @@ npm run tauri build
 
 ## First install vs updater
 
-Apple notarization / Developer ID and Windows Authenticode still apply to the
-initial installer trust. The Tauri updater verifies minisign signatures of update
-payloads; it does not replace OS code-signing for first install.
+- **macOS** : Developer ID + notarization (Gatekeeper).
+- **Windows** : pas de certificat Authenticode pour l’instant (coût). Le NSIS
+  CI est unsigned ; SmartScreen peut afficher « éditeur inconnu »
+  (Plus d’infos → Exécuter quand même). À revoir plus tard si besoin
+  (Azure Artifact Signing ou OV).
+
+The Tauri updater verifies minisign signatures of update payloads; it does not
+replace OS code-signing for first install.
 
 ## Test checklist
 

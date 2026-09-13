@@ -62,3 +62,6 @@ src-tauri/*.key.pub
 *.nsis.zip
 *.app.tar.gz
 *.app.tar.gz.sig
+
+# Local-only release publish helpers (not versioned)
+scripts/publish-downloads.mjs

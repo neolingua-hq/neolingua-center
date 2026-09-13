@@ -1083,11 +1083,16 @@ fn find_whisper_model() -> Result<PathBuf, String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
+            // macOS: Contents/Resources/whisper (mapped resource)
             candidates.push(dir.join("../Resources/whisper").join(NAME));
+            // Legacy layout from older bundles (resources/whisper/* → Resources/resources/…)
+            candidates.push(dir.join("../Resources/resources/whisper").join(NAME));
+            // Windows / flat layouts next to the executable
             candidates.push(dir.join("resources/whisper").join(NAME));
             candidates.push(dir.join("whisper").join(NAME));
         }
     }
+    // Development: crate resources next to Cargo.toml
     candidates.push(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("resources")
@@ -1096,7 +1101,7 @@ fn find_whisper_model() -> Result<PathBuf, String> {
     );
     for candidate in &candidates {
         if candidate.is_file() {
-            return Ok(candidate.clone());
+            return Ok(candidate.canonicalize().unwrap_or_else(|_| candidate.clone()));
         }
     }
     Err(

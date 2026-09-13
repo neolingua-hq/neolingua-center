@@ -113,9 +113,34 @@ pub struct ServerController {
     inner: Mutex<Inner>,
 }
 
+/// Resolve the LAN viewer static files: bundled Resources in release, crate
+/// `viewer/` in development.
+fn resolve_viewer_dir() -> PathBuf {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            // macOS app: Contents/MacOS → Contents/Resources/viewer
+            candidates.push(dir.join("../Resources/viewer"));
+            candidates.push(dir.join("resources/viewer"));
+            candidates.push(dir.join("viewer"));
+        }
+    }
+    candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("viewer"));
+
+    for candidate in &candidates {
+        if candidate.join("index.html").is_file() {
+            return candidate
+                .canonicalize()
+                .unwrap_or_else(|_| candidate.clone());
+        }
+    }
+
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("viewer")
+}
+
 impl ServerController {
     pub fn new(db_path: PathBuf, prep: Arc<PrepRegistry>) -> Self {
-        let viewer_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("viewer");
+        let viewer_dir = resolve_viewer_dir();
         Self {
             db_path,
             prep,
@@ -273,6 +298,14 @@ async fn run_http_server(
     };
 
     let index = state.viewer_dir.join("index.html");
+    if !index.is_file() {
+        let message = format!(
+            "Viewer LAN introuvable (attendu : {}). Réinstallez Neolingua Center.",
+            index.display()
+        );
+        controller.apply_bind_err(port, message);
+        return;
+    }
     let static_files = ServeDir::new(&state.viewer_dir)
         .append_index_html_on_directories(true)
         .fallback(ServeFile::new(index));

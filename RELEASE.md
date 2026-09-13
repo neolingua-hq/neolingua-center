@@ -38,6 +38,10 @@ A full release (macOS + Windows) therefore goes through
 `.github/workflows/release-center.yml` (matrix `macos` + `windows-latest`), not a
 single local `tauri build`. Local Mac builds are for smoke / `/Applications` only.
 
+Windows NSIS is **not** Authenticode-signed (intentional): SmartScreen may warn
+« unknown publisher ». macOS stays Developer ID + notarized. Only
+`TAURI_SIGNING_PRIVATE_KEY` is required for the updater (minisign) on both OS.
+
 ```bash
 export TAURI_SIGNING_PRIVATE_KEY="$(cat .secrets/neolingua-center.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
@@ -82,7 +86,7 @@ R2_ACCESS_KEY_ID=…
 R2_SECRET_ACCESS_KEY=…
 ```
 
-Publish:
+Publish (script local, non versionné : `scripts/publish-downloads.mjs`) :
 
 ```bash
 npm run publish-downloads
@@ -90,14 +94,14 @@ npm run publish-downloads
 
 Writes:
 
-- `macos/latest.dmg` + versioned copy
-- `windows/latest.exe` + versioned copy (if an NSIS build is present)
+- `macos/neolingua-latest.dmg` + versioned copy
+- `windows/neolingua-latest.exe` + versioned copy (if an NSIS build is present)
 
 Smoke:
 
 ```bash
-curl -sI https://download.neolingua.app/macos/latest.dmg | head
-curl -sI https://download.neolingua.app/windows/latest.exe | head
+curl -sI https://download.neolingua.app/macos/neolingua-latest.dmg | head
+curl -sI https://download.neolingua.app/windows/neolingua-latest.exe | head
 ```
 
 Content-Length must be a real installer size (not a ~35 byte stub).
@@ -110,7 +114,7 @@ When the GitHub repo and secrets are ready:
 2. Tag `X.Y.Z` (or `1.0.0-beta.1`) matching the bumped version - no `v` prefix
 3. Workflow `.github/workflows/release-center.yml` builds platforms and uploads
    `latest.json` via `tauri-action`
-4. The same workflow uploads `latest.dmg` / `latest.exe` to R2
+4. The same workflow uploads `neolingua-latest.dmg` / `neolingua-latest.exe` to R2
 
 Secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
 `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
