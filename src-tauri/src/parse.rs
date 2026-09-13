@@ -9,14 +9,75 @@ const VIDEO_EXT: &[&str] = &["mkv", "mp4", "m4v", "avi", "webm", "mov"];
 
 /// Scene / quality tokens to strip from the title (not show names).
 const SCENE_TOKENS: &[&str] = &[
-    "1080p", "720p", "480p", "2160p", "4k", "uhd", "hdr", "hdr10", "dv", "dolby",
-    "web", "webrip", "web-dl", "webdl", "bluray", "blu-ray", "bdrip", "brrip", "hdtv",
-    "dvdrip", "hdrip", "remux", "proper", "repack", "internal", "extended", "unrated",
-    "x265", "x264", "h264", "h265", "h.264", "h.265", "hevc", "avc", "av1", "10bit", "8bit",
-    "aac", "ac3", "dts", "dts-hd", "truehd", "atmos", "flac", "mp3",
-    "multi", "vff", "vfq", "vf2", "vfi", "vo", "vovf", "truefrench", "french", "english",
-    "subforced", "subs", "sub", "nl", "amu",
-    "amzn", "nf", "dsnp", "hmax", "atvp", "hulu", "cr", "itunes",
+    "1080p",
+    "720p",
+    "480p",
+    "2160p",
+    "4k",
+    "uhd",
+    "hdr",
+    "hdr10",
+    "dv",
+    "dolby",
+    "web",
+    "webrip",
+    "web-dl",
+    "webdl",
+    "bluray",
+    "blu-ray",
+    "bdrip",
+    "brrip",
+    "hdtv",
+    "dvdrip",
+    "hdrip",
+    "remux",
+    "proper",
+    "repack",
+    "internal",
+    "extended",
+    "unrated",
+    "x265",
+    "x264",
+    "h264",
+    "h265",
+    "h.264",
+    "h.265",
+    "hevc",
+    "avc",
+    "av1",
+    "10bit",
+    "8bit",
+    "aac",
+    "ac3",
+    "dts",
+    "dts-hd",
+    "truehd",
+    "atmos",
+    "flac",
+    "mp3",
+    "multi",
+    "vff",
+    "vfq",
+    "vf2",
+    "vfi",
+    "vo",
+    "vovf",
+    "truefrench",
+    "french",
+    "english",
+    "subforced",
+    "subs",
+    "sub",
+    "nl",
+    "amu",
+    "amzn",
+    "nf",
+    "dsnp",
+    "hmax",
+    "atvp",
+    "hulu",
+    "cr",
+    "itunes",
 ];
 
 const GENERIC_STEMS: &[&str] = &[
@@ -52,7 +113,9 @@ pub enum ParsedMedia {
 
 fn se_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?i)(?:^|[\s._\-\[\(])S(\d{1,2})E(\d{1,3})(?:$|[\s._\-\]\)])").expect("se"))
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)(?:^|[\s._\-\[\(])S(\d{1,2})E(\d{1,3})(?:$|[\s._\-\]\)])").expect("se")
+    })
 }
 
 fn se_loose_re() -> &'static Regex {
@@ -63,7 +126,9 @@ fn se_loose_re() -> &'static Regex {
 fn nxnn_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // 1x02 pattern - avoid years like 2020 by requiring x
-    RE.get_or_init(|| Regex::new(r"(?i)(?:^|[\s._\-])(\d{1,2})x(\d{1,3})(?:$|[\s._\-])").expect("nxnn"))
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)(?:^|[\s._\-])(\d{1,2})x(\d{1,3})(?:$|[\s._\-])").expect("nxnn")
+    })
 }
 
 fn season_dir_re() -> &'static Regex {
@@ -75,7 +140,9 @@ fn season_dir_re() -> &'static Regex {
 
 fn year_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?i)(?:^|[\s._\-(])((?:19|20)\d{2})(?:$|[\s._\-)])").expect("year"))
+    RE.get_or_init(|| {
+        Regex::new(r"(?i)(?:^|[\s._\-(])((?:19|20)\d{2})(?:$|[\s._\-)])").expect("year")
+    })
 }
 
 fn release_group_re() -> &'static Regex {
@@ -132,7 +199,10 @@ fn is_scene_token(token: &str) -> bool {
         return true;
     }
     // Resolutions like 1920x1080
-    if Regex::new(r"^\d{3,4}x\d{3,4}$").ok().is_some_and(|re| re.is_match(&lower)) {
+    if Regex::new(r"^\d{3,4}x\d{3,4}$")
+        .ok()
+        .is_some_and(|re| re.is_match(&lower))
+    {
         return true;
     }
     false
@@ -294,7 +364,11 @@ pub fn parse_video(abs: &Path) -> ParsedMedia {
                 continue;
             }
             let year = extract_year(&candidate);
-            let confidence = if !before.trim().is_empty() { 0.95 } else { 0.75 };
+            let confidence = if !before.trim().is_empty() {
+                0.95
+            } else {
+                0.75
+            };
             return ParsedMedia::Episode(ParsedEpisode {
                 normalized_title: normalize_title(&title),
                 title: display_title(&title),
@@ -309,10 +383,7 @@ pub fn parse_video(abs: &Path) -> ParsedMedia {
 
     // No SxxExx in the name: folder season + episode from an alternate pattern
     if let (Some(title), Some(season)) = (path_show.clone(), path_season) {
-        let stem = abs
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default();
+        let stem = abs.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
         // E01 / ep01 / 01 patterns in the stem
         if let Some(ep) = parse_episode_only(stem) {
             return ParsedMedia::Episode(ParsedEpisode {
@@ -328,10 +399,7 @@ pub fn parse_video(abs: &Path) -> ParsedMedia {
     }
 
     // Movie
-    let stem = abs
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("film");
+    let stem = abs.file_stem().and_then(|s| s.to_str()).unwrap_or("film");
     let mut title_src = if is_generic_stem(stem) {
         abs.parent()
             .and_then(|p| p.file_name())
@@ -358,7 +426,8 @@ pub fn parse_video(abs: &Path) -> ParsedMedia {
 fn parse_episode_only(stem: &str) -> Option<i32> {
     static RE: OnceLock<Regex> = OnceLock::new();
     let re = RE.get_or_init(|| {
-        Regex::new(r"(?i)(?:^|[\s._\-])(?:e|ep|episode)?[\s._\-]*(\d{1,3})(?:$|[\s._\-])").expect("ep")
+        Regex::new(r"(?i)(?:^|[\s._\-])(?:e|ep|episode)?[\s._\-]*(\d{1,3})(?:$|[\s._\-])")
+            .expect("ep")
     });
     let caps = re.captures(stem)?;
     let n: i32 = caps.get(1)?.as_str().parse().ok()?;
@@ -389,9 +458,8 @@ mod tests {
 
     #[test]
     fn per_release_folder() {
-        let p = PathBuf::from(
-            "/series/Futurama.S08E02.MULTi.1080p.WEB.x265-GROUP/Futurama.S08E02.mkv",
-        );
+        let p =
+            PathBuf::from("/series/Futurama.S08E02.MULTi.1080p.WEB.x265-GROUP/Futurama.S08E02.mkv");
         match parse_video(&p) {
             ParsedMedia::Episode(ep) => {
                 assert_eq!(ep.normalized_title, "futurama");

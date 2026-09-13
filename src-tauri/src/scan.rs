@@ -174,9 +174,12 @@ pub fn scan_roots(roots: &[String]) -> Result<(CatalogSnapshot, Vec<PathMapping>
                             existing.3 = ep.confidence;
                         }
                     } else {
-                        entry
-                            .episodes
-                            .push((ep.season, ep.episode, abs_str.clone(), ep.confidence));
+                        entry.episodes.push((
+                            ep.season,
+                            ep.episode,
+                            abs_str.clone(),
+                            ep.confidence,
+                        ));
                     }
 
                     mappings.push(PathMapping {
@@ -192,7 +195,8 @@ pub fn scan_roots(roots: &[String]) -> Result<(CatalogSnapshot, Vec<PathMapping>
                     });
                 }
                 ParsedMedia::Movie(movie) => {
-                    let mut id = local_series_id(&movie.normalized_title).replacen("local:", "movie:", 1);
+                    let mut id =
+                        local_series_id(&movie.normalized_title).replacen("local:", "movie:", 1);
                     if let Some(idx) = movie_by_norm.get(&movie.normalized_title) {
                         // Same title: keep the first, or create a path-based id if paths differ
                         let existing = &movies[*idx];
@@ -354,10 +358,7 @@ pub fn mappings_from_snapshot(snapshot: &CatalogSnapshot) -> Vec<PathMapping> {
     }
     out
 }
-pub fn apply_overrides(
-    snapshot: &mut CatalogSnapshot,
-    overrides: &[crate::db::CatalogOverride],
-) {
+pub fn apply_overrides(snapshot: &mut CatalogSnapshot, overrides: &[crate::db::CatalogOverride]) {
     for ov in overrides {
         match ov.kind.as_str() {
             "rename" => {
@@ -369,8 +370,11 @@ pub fn apply_overrides(
                 }
             }
             "merge" => {
-                let Some(target) = ov.target_key.as_ref() else { continue };
-                let Some(src_idx) = snapshot.series.iter().position(|s| s.id == ov.source_key) else {
+                let Some(target) = ov.target_key.as_ref() else {
+                    continue;
+                };
+                let Some(src_idx) = snapshot.series.iter().position(|s| s.id == ov.source_key)
+                else {
                     continue;
                 };
                 let Some(dst_idx) = snapshot.series.iter().position(|s| &s.id == target) else {
@@ -380,10 +384,15 @@ pub fn apply_overrides(
                     continue;
                 }
                 let mut src = snapshot.series.remove(src_idx);
-                let dst_idx = if dst_idx > src_idx { dst_idx - 1 } else { dst_idx };
+                let dst_idx = if dst_idx > src_idx {
+                    dst_idx - 1
+                } else {
+                    dst_idx
+                };
                 let dst = &mut snapshot.series[dst_idx];
                 for season in src.seasons.drain(..) {
-                    if let Some(existing) = dst.seasons.iter_mut().find(|s| s.number == season.number)
+                    if let Some(existing) =
+                        dst.seasons.iter_mut().find(|s| s.number == season.number)
                     {
                         for ep in season.episodes {
                             if !existing.episodes.iter().any(|e| e.episode == ep.episode) {
@@ -438,7 +447,11 @@ mod tests {
         let (snap, _) = scan_roots(&[root.to_string_lossy().into()]).unwrap();
         assert_eq!(snap.series.len(), 1);
         assert_eq!(parse::normalize_title(&snap.series[0].title), "futurama");
-        let eps: usize = snap.series[0].seasons.iter().map(|s| s.episodes.len()).sum();
+        let eps: usize = snap.series[0]
+            .seasons
+            .iter()
+            .map(|s| s.episodes.len())
+            .sum();
         assert_eq!(eps, 3);
         fs::remove_dir_all(&root).ok();
     }
@@ -456,7 +469,10 @@ mod tests {
         let (snap, _) = scan_roots(&[root.to_string_lossy().into()]).unwrap();
         assert_eq!(snap.series.len(), 1);
         assert_eq!(snap.series[0].seasons.len(), 5);
-        assert_eq!(parse::normalize_title(&snap.series[0].title), "breaking bad");
+        assert_eq!(
+            parse::normalize_title(&snap.series[0].title),
+            "breaking bad"
+        );
         fs::remove_dir_all(&root).ok();
     }
 
@@ -472,7 +488,13 @@ mod tests {
         fs::remove_dir_all(&root).ok();
     }
 
-    fn sample_series(id: &str, title: &str, season: i32, episode: i32, path: &str) -> CatalogSeries {
+    fn sample_series(
+        id: &str,
+        title: &str,
+        season: i32,
+        episode: i32,
+        path: &str,
+    ) -> CatalogSeries {
         CatalogSeries {
             id: id.into(),
             title: title.into(),

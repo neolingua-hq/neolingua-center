@@ -137,9 +137,7 @@ fn load_preserved(conn: &Connection) -> Result<Preserved, String> {
 
     let mut seasons = HashMap::new();
     let mut season_stmt = conn
-        .prepare(
-            "SELECT series_id, number, title, poster_url, synopsis FROM catalog_seasons",
-        )
+        .prepare("SELECT series_id, number, title, poster_url, synopsis FROM catalog_seasons")
         .map_err(|e| e.to_string())?;
     let season_rows = season_stmt
         .query_map([], |row| {
@@ -250,7 +248,8 @@ fn apply_preserved(snapshot: &mut CatalogSnapshot, preserved: &Preserved) {
                 series.id = id;
             }
             for season in &mut series.seasons {
-                if let Some(prev_season) = preserved.seasons.get(&(series.id.clone(), season.number))
+                if let Some(prev_season) =
+                    preserved.seasons.get(&(series.id.clone(), season.number))
                 {
                     if season.title.is_none() {
                         season.title = prev_season.title.clone();
@@ -481,4 +480,3 @@ mod tests {
         assert_eq!(dst.seasons[0].title.as_deref(), Some("S1"));
     }
 }
-

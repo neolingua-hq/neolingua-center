@@ -43,9 +43,31 @@ fn is_private_lan_ip(ip: &Ipv4Addr) -> bool {
 fn is_virtual_interface_name(name: &str) -> bool {
     let n = name.to_lowercase();
     const PREFIXES: &[&str] = &[
-        "lo", "utun", "bridge", "awdl", "llw", "anpi", "gif", "stf", "vmenet", "vboxnet", "vmnet",
-        "docker", "veth", "br-", "vethernet", "virtualbox", "vmware", "hyper-v", "npcap",
-        "tailscale", "wireguard", "wintun", "loopback", "isatap", "teredo",
+        "lo",
+        "utun",
+        "bridge",
+        "awdl",
+        "llw",
+        "anpi",
+        "gif",
+        "stf",
+        "vmenet",
+        "vboxnet",
+        "vmnet",
+        "docker",
+        "veth",
+        "br-",
+        "vethernet",
+        "virtualbox",
+        "vmware",
+        "hyper-v",
+        "npcap",
+        "tailscale",
+        "wireguard",
+        "wintun",
+        "loopback",
+        "isatap",
+        "teredo",
     ];
     PREFIXES.iter().any(|prefix| n.starts_with(prefix))
 }
