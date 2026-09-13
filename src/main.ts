@@ -1165,16 +1165,17 @@ function renderSeasonPage(seriesId: string, seasonNumber: number): string {
   `;
 }
 
-/** Small EN/FR flags only when the track source is known (native or generated). */
+/** Small EN/FR flags only when the track source is known (native or generated).
+ * SVG (not emoji): Windows does not render regional-indicator flag glyphs. */
 function formatTrackFlags(prep: EpisodePrep | null | undefined): string {
   const status = prep?.status ?? "missing";
   if (status === "missing" || status === "processing" || status === "queued") {
     return "";
   }
   const chips: string[] = [];
-  for (const [lang, flag, source] of [
-    ["en", "🇬🇧", prep?.enSource],
-    ["fr", "🇫🇷", prep?.frSource],
+  for (const [lang, flagSrc, source] of [
+    ["en", "/flags/gb.svg", prep?.enSource],
+    ["fr", "/flags/fr.svg", prep?.frSource],
   ] as const) {
     if (source !== "native" && source !== "generated") continue;
     const tip = trackSourceTooltip(source);
@@ -1183,7 +1184,7 @@ function formatTrackFlags(prep: EpisodePrep | null | undefined): string {
         ? `<span class="episode-flag-note">(généré)</span>`
         : "";
     chips.push(
-      `<span class="episode-flag episode-flag--${escapeHtml(source)}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(lang.toUpperCase())} : ${escapeHtml(tip)}"><span class="episode-flag-emoji" aria-hidden="true">${flag}</span>${generatedNote}</span>`,
+      `<span class="episode-flag episode-flag--${escapeHtml(source)}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(lang.toUpperCase())} : ${escapeHtml(tip)}"><img class="episode-flag-img" src="${flagSrc}" width="18" height="12" alt="" decoding="async" />${generatedNote}</span>`,
     );
   }
   if (chips.length === 0) return "";

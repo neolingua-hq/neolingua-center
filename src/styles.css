@@ -1563,8 +1563,13 @@ button.ghost:hover {
   cursor: default;
 }
 
-.episode-flag-emoji {
-  filter: drop-shadow(0 0 0.5px rgba(20, 24, 32, 0.2));
+.episode-flag-img {
+  display: block;
+  width: 1.125rem;
+  height: 0.75rem;
+  object-fit: cover;
+  border-radius: 0.1rem;
+  box-shadow: 0 0 0 1px rgba(20, 24, 32, 0.12);
 }
 
 .episode-flag-note {
