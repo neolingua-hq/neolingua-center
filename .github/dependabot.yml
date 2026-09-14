@@ -1,7 +1,7 @@
 # Dependabot version updates (free on private repos).
 # Security updates are enabled separately via Terraform
 # (infrastructure/github → github_repository_dependabot_security_updates).
-# Pattern aligné sur Vesta / TTR / Deescover.
+# Pattern aligned with Vesta / TTR / Deescover.
 
 version: 2
 updates:

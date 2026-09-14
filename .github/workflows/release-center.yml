@@ -101,9 +101,9 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('{0}', github.run_number) }}
           releaseName: Neolingua Center ${{ github.ref_type == 'tag' && github.ref_name || format('{0}', github.run_number) }}
           releaseBody: |
-            Installateurs et mises à jour automatiques pour Neolingua Center.
-            Première install : https://download.neolingua.app
-            L’app vérifie `latest.json` sur cette release pour les mises à jour.
+            Installers and automatic updates for Neolingua Center.
+            First install: https://download.neolingua.app
+            The app checks `latest.json` on this release for updates.
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
           uploadUpdaterJson: true
