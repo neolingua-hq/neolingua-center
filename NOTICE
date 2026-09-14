@@ -1,0 +1,36 @@
+Neolingua Center
+Copyright (C) 2026 Martin Catty
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by the
+Free Software Foundation, version 3 of the License only.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+Source: https://github.com/neolingua-hq/neolingua-center
+
+Third-party components bundled or downloaded at runtime
+
+ffmpeg / ffprobe
+  Sidecar binaries fetched from eugeneware/ffmpeg-static (b6.1.1).
+  FFmpeg is typically licensed under the GNU GPL. See
+  https://ffmpeg.org/legal.html and the ffmpeg-static release notes.
+
+whisper-cli
+  Built from ggml-org/whisper.cpp (MIT).
+  https://github.com/ggml-org/whisper.cpp
+
+ggml-small.bin
+  Whisper "small" weights, downloaded at first transcription into app data
+  (not shipped in the installer). Upstream:
+  https://huggingface.co/ggerganov/whisper.cpp
+  Converted from OpenAI Whisper (MIT).
+
+Other Rust crates and npm packages
+  See src-tauri/Cargo.lock and package-lock.json for versions and licenses.

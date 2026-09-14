@@ -1,4 +1,4 @@
-# Neolingua Center — release checklist
+# Neolingua Center : release checklist
 
 First install (marketing site) and in-app updates use **two different channels**.
 
@@ -7,9 +7,9 @@ First install (marketing site) and in-app updates use **two different channels**
 | Site / première install | R2 `download.neolingua.app` | macOS `.dmg`, Windows NSIS `.exe` |
 | Updater in-app | GitHub Releases + `latest.json` | `.app.tar.gz` (+ `.sig`), NSIS `.exe` (+ `.sig`) |
 
-Details: [DOWNLOADS.md](../website/DOWNLOADS.md), [UPDATER.md](UPDATER.md).
+Details: [UPDATER.md](UPDATER.md).
 
-## 1. Bump version (lockstep)
+## Bump version (lockstep)
 
 Update the same SemVer string in:
 
@@ -20,14 +20,13 @@ Update the same SemVer string in:
 
 Example for a beta: `1.0.0-beta.1` (SemVer pre-release with a hyphen).
 
-## 2. Test
+## Test
 
 ```bash
-cd neolingua-center
 npm test
 ```
 
-## 3. Signed build
+## Signed build
 
 Tauri produces **host-OS installers only**:
 
@@ -38,7 +37,7 @@ A full release (macOS + Windows) therefore goes through
 `.github/workflows/release-center.yml` (matrix `macos` + `windows-latest`), not a
 single local `tauri build`. Local Mac builds are for smoke / `/Applications` only.
 
-Windows NSIS is **not** Authenticode-signed (intentional): SmartScreen may warn
+Windows NSIS is **not** Authenticode-signed: SmartScreen may warn
 « unknown publisher ». macOS stays Developer ID + notarized. Only
 `TAURI_SIGNING_PRIVATE_KEY` is required for the updater (minisign) on both OS.
 
@@ -58,49 +57,28 @@ rm -rf "/Applications/Neolingua Center.app"
 cp -R "src-tauri/target/release/bundle/macos/Neolingua Center.app" "/Applications/"
 ```
 
-## 4. Publish first-install binaries to R2
+## Publish first-install binaries to R2
 
-Installers no longer embed the transcription model. Expected DMG / NSIS size is
+Installers do not embed the transcription model. Expected DMG / NSIS size is
 around 50 MB. The model is a separate immutable object:
 
 `https://download.neolingua.app/whisper/ggml-small.bin`
 
-Create an R2 API token once (Object Read & Write on `neolingua-downloads`):
-
-https://dash.cloudflare.com/?to=/:account/r2/api-tokens
-
-Preferred source: AWS Secrets Manager `neolingua/r2/neolingua-release`
-(managed by `homelab/infrastructure/cloudflare/r2`). Token name: `neolingua-release`.
-
-Then either export:
+CI uploads installers and the Whisper model. For a local publish of the model,
+create a Cloudflare R2 API token (Object Read & Write on `neolingua-downloads`)
+and either export:
 
 ```bash
-export CLOUDFLARE_ACCOUNT_ID="…"   # from wrangler whoami / dashboard
+export CLOUDFLARE_ACCOUNT_ID="…"
 export R2_ACCESS_KEY_ID="…"
 export R2_SECRET_ACCESS_KEY="…"
 ```
 
-or write `neolingua-center/.secrets/r2.env` (gitignored; see `r2.env.example`):
+or copy `r2.env.example` to `.secrets/r2.env` (gitignored).
 
 ```bash
-CLOUDFLARE_ACCOUNT_ID=…
-R2_ACCESS_KEY_ID=…
-R2_SECRET_ACCESS_KEY=…
-```
-
-Publish installers (script local, non versionné : `scripts/publish-downloads.mjs`)
-and the model if R2 does not already have the expected file:
-
-```bash
-npm run publish-downloads
 npm run publish-whisper-model
 ```
-
-Writes:
-
-- `macos/neolingua-latest.dmg` + versioned copy
-- `windows/neolingua-latest.exe` + versioned copy (if an NSIS build is present)
-- `whisper/ggml-small.bin` (skipped when the object size already matches)
 
 Smoke:
 
@@ -113,9 +91,7 @@ curl -sI https://download.neolingua.app/whisper/ggml-small.bin | head
 Content-Length must be a real installer size (not a ~35 byte stub). The model
 must be 487601967 bytes.
 
-## 5. GitHub release (updater)
-
-When the GitHub repo and secrets are ready:
+## GitHub release (updater)
 
 1. Commit and push
 2. Tag `X.Y.Z` (or `1.0.0-beta.1`) matching the bumped version - no `v` prefix
@@ -124,14 +100,7 @@ When the GitHub repo and secrets are ready:
 4. The same workflow uploads `neolingua-latest.dmg` / `neolingua-latest.exe` to R2
    and publishes `whisper/ggml-small.bin` if it is not already on the bucket
 
-Secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`,
-`CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
-
-## 6. Site HTML
-
-Stable download URLs do not change. Redeploy Pages only if the marketing page
-copy or link paths changed:
-
-```bash
-cd website && ./deploy.sh
-```
+GitHub Actions secrets: `TAURI_SIGNING_PRIVATE_KEY`,
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple signing (`APPLE_*`,
+`KEYCHAIN_PASSWORD`), `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`. Values never belong in git.
