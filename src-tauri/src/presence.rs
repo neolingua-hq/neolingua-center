@@ -127,7 +127,12 @@ impl Default for PresenceRegistry {
 mod tests {
     use super::*;
 
-    fn beat(client_id: &str, mode: WatchMode, title: Option<&str>, playing: bool) -> PresenceHeartbeat {
+    fn beat(
+        client_id: &str,
+        mode: WatchMode,
+        title: Option<&str>,
+        playing: bool,
+    ) -> PresenceHeartbeat {
         PresenceHeartbeat {
             client_id: client_id.into(),
             mode,
@@ -166,4 +171,3 @@ mod tests {
         assert_eq!(ids, vec!["a".to_string(), "z".to_string()]);
     }
 }
-

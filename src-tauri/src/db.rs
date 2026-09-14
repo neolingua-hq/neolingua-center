@@ -79,10 +79,7 @@ pub struct DbState {
 }
 
 pub fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("neolingua.sqlite"))
 }
@@ -211,11 +208,8 @@ fn migrate_baseline(conn: &Connection) -> Result<(), String> {
         "#,
     )
     .map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO schema_migrations (version) VALUES (1)",
-        [],
-    )
-    .map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO schema_migrations (version) VALUES (1)", [])
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -346,7 +340,11 @@ pub fn save_settings(conn: &Connection, settings: &AppSettings) -> Result<(), St
             settings.tmdb_api_key.trim(),
             settings.library_check_minutes as i32,
             settings.cache_max_gb as i32,
-            if settings.purge_cache_after_watch { 1 } else { 0 },
+            if settings.purge_cache_after_watch {
+                1
+            } else {
+                0
+            },
             if settings.jam_quiz_mode { 1 } else { 0 },
             normalize_quiz_interval(settings.jam_quiz_interval_seconds) as i32,
             if settings.jam_display_sub_en { 1 } else { 0 },
@@ -368,9 +366,7 @@ pub fn cache_max_bytes(cache_max_gb: u32) -> u64 {
 
 pub fn list_media_roots(conn: &Connection) -> Result<Vec<MediaRoot>, String> {
     let mut stmt = conn
-        .prepare(
-            "SELECT id, path, sort_order FROM media_roots ORDER BY sort_order ASC, id ASC",
-        )
+        .prepare("SELECT id, path, sort_order FROM media_roots ORDER BY sort_order ASC, id ASC")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| {
@@ -433,9 +429,7 @@ pub fn remove_media_root(conn: &Connection, id: i64) -> Result<(), String> {
 
 pub fn replace_catalog(conn: &Connection, snapshot: &CatalogSnapshot) -> Result<(), String> {
     // Atomic replace: readers must never see a half-written catalog (e.g. 9 series, 0 movies).
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     tx.execute_batch(
         r#"
         DELETE FROM catalog_episodes;
@@ -581,9 +575,11 @@ pub fn list_catalog_overrides(conn: &Connection) -> Result<Vec<CatalogOverride>,
 
 pub fn load_catalog(conn: &Connection) -> Result<CatalogSnapshot, String> {
     let scanned_at: Option<String> = conn
-        .query_row("SELECT scanned_at FROM catalog_meta WHERE id = 1", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT scanned_at FROM catalog_meta WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
         .optional()
         .map_err(|e| e.to_string())?;
 
@@ -767,7 +763,10 @@ pub fn normalize_track_language(raw: Option<&str>) -> Option<&'static str> {
 
 /// Original language for a media path (series or movie), already normalized to en/fr when possible.
 /// Returns the raw TMDB code when outside en/fr so callers can explain why Whisper is skipped.
-pub fn lookup_original_language(conn: &Connection, media_path: &str) -> Result<Option<String>, String> {
+pub fn lookup_original_language(
+    conn: &Connection,
+    media_path: &str,
+) -> Result<Option<String>, String> {
     let from_series: Option<String> = conn
         .query_row(
             r#"

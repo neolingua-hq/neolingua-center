@@ -334,7 +334,10 @@ fn peer_snapshot(session: &Session) -> PeersMessage {
     let active: Vec<&Peer> = session.peers.iter().filter(|p| is_peer_active(p)).collect();
     PeersMessage {
         msg_type: "peers",
-        companions: active.iter().filter(|p| p.role == JamRole::Companion).count(),
+        companions: active
+            .iter()
+            .filter(|p| p.role == JamRole::Companion)
+            .count(),
         displays: active.iter().filter(|p| p.role == JamRole::Display).count(),
         total: active.len(),
         admin_id: session.state.admin_id.clone(),
@@ -414,16 +417,19 @@ fn answer_key(peer: &Peer) -> &str {
 
 fn ensure_score(session: &mut Session, peer: &Peer) {
     let key = score_key(peer).to_string();
-    let score = session.scores.entry(key.clone()).or_insert_with(|| PlayerScore {
-        client_id: peer.client_id.clone(),
-        peer_id: peer.id.clone(),
-        name: peer.name.clone(),
-        points: 0,
-        correct_answers: 0,
-        wrong_answers: 0,
-        total_response_ms: 0,
-        rounds_played: 0,
-    });
+    let score = session
+        .scores
+        .entry(key.clone())
+        .or_insert_with(|| PlayerScore {
+            client_id: peer.client_id.clone(),
+            peer_id: peer.id.clone(),
+            name: peer.name.clone(),
+            points: 0,
+            correct_answers: 0,
+            wrong_answers: 0,
+            total_response_ms: 0,
+            rounds_played: 0,
+        });
     score.peer_id = peer.id.clone();
     score.name = peer.name.clone();
 }
@@ -791,11 +797,7 @@ struct QuizProposeMsg {
     t: Option<f64>,
 }
 
-fn start_quiz(
-    registry: &Arc<JamRegistry>,
-    handle: &SessionHandle,
-    msg: QuizProposeMsg,
-) {
+fn start_quiz(registry: &Arc<JamRegistry>, handle: &SessionHandle, msg: QuizProposeMsg) {
     let mut session = handle.lock().expect("session lock");
     if !session.state.quiz_mode {
         return;
@@ -915,20 +917,25 @@ fn start_quiz(
             if round.id != expected_id || round.status != QuizStatus::Open {
                 return;
             }
-            let companion_snapshot: Vec<(String, String, String, mpsc::UnboundedSender<String>, u64)> =
-                companions(&session)
-                    .into_iter()
-                    .filter(|p| !round.answers.contains_key(answer_key(p)))
-                    .map(|p| {
-                        (
-                            p.id.clone(),
-                            p.client_id.clone(),
-                            p.name.clone(),
-                            p.tx.clone(),
-                            p.conn_id,
-                        )
-                    })
-                    .collect();
+            let companion_snapshot: Vec<(
+                String,
+                String,
+                String,
+                mpsc::UnboundedSender<String>,
+                u64,
+            )> = companions(&session)
+                .into_iter()
+                .filter(|p| !round.answers.contains_key(answer_key(p)))
+                .map(|p| {
+                    (
+                        p.id.clone(),
+                        p.client_id.clone(),
+                        p.name.clone(),
+                        p.tx.clone(),
+                        p.conn_id,
+                    )
+                })
+                .collect();
 
             for (id, client_id, name, tx, conn_id) in companion_snapshot {
                 let peer = Peer {
@@ -942,7 +949,11 @@ fn start_quiz(
                     conn_id,
                 };
                 let results = record_round_answer(&mut session, &peer, HashMap::new(), true);
-                let round_id = session.quiz.as_ref().map(|q| q.id.clone()).unwrap_or_default();
+                let round_id = session
+                    .quiz
+                    .as_ref()
+                    .map(|q| q.id.clone())
+                    .unwrap_or_default();
                 let _ = tx.send(
                     serde_json::to_string(&serde_json::json!({
                         "type": "quizFeedback",
@@ -1183,7 +1194,8 @@ fn attach_peer(session: &mut Session, peer_idx: usize, resumed: bool) {
     send_joined(session, &session.peers[peer_idx], resumed);
     send_text(&session.peers[peer_idx], &state_message(session));
     broadcast_all(session, &peer_snapshot(session));
-    if peer_role == JamRole::Companion && session.state.admin_id.as_deref() == Some(peer_id.as_str())
+    if peer_role == JamRole::Companion
+        && session.state.admin_id.as_deref() == Some(peer_id.as_str())
     {
         broadcast_all(
             session,
@@ -1258,7 +1270,8 @@ fn replace_peer_socket(
     broadcast_all(session, &peer_snapshot(session));
     let peer_id = session.peers[peer_idx].id.clone();
     let peer_role = session.peers[peer_idx].role;
-    if peer_role == JamRole::Companion && session.state.admin_id.as_deref() == Some(peer_id.as_str())
+    if peer_role == JamRole::Companion
+        && session.state.admin_id.as_deref() == Some(peer_id.as_str())
     {
         broadcast_all(
             session,
@@ -1532,8 +1545,7 @@ async fn handle_socket(socket: WebSocket, registry: Arc<JamRegistry>, session_id
                 session.peer_seq += 1;
                 let seq = session.peer_seq;
                 let fallback = format!("anon-{seq}");
-                let client_id =
-                    normalize_client_id(client_id.as_deref(), &fallback);
+                let client_id = normalize_client_id(client_id.as_deref(), &fallback);
                 session.next_conn_id += 1;
                 let conn_id = session.next_conn_id;
 
@@ -1542,13 +1554,7 @@ async fn handle_socket(socket: WebSocket, registry: Arc<JamRegistry>, session_id
                     .iter()
                     .position(|p| p.client_id == client_id && p.role == role)
                 {
-                    replace_peer_socket(
-                        &mut session,
-                        idx,
-                        tx.clone(),
-                        name,
-                        conn_id,
-                    );
+                    replace_peer_socket(&mut session, idx, tx.clone(), name, conn_id);
                     peer_id = Some(session.peers[idx].id.clone());
                     peer_conn_id = Some(conn_id);
                     continue;
@@ -1839,15 +1845,17 @@ fn handle_peer_message(
             };
             let results = record_round_answer(&mut session, &peer_snapshot, answers, false);
             let needed = companions(&session);
-            let waiting = !needed
-                .iter()
-                .all(|p| {
-                    session
-                        .quiz
-                        .as_ref()
-                        .is_some_and(|r| r.answers.contains_key(answer_key(p)))
-                });
-            let rid = session.quiz.as_ref().map(|q| q.id.clone()).unwrap_or_default();
+            let waiting = !needed.iter().all(|p| {
+                session
+                    .quiz
+                    .as_ref()
+                    .is_some_and(|r| r.answers.contains_key(answer_key(p)))
+            });
+            let rid = session
+                .quiz
+                .as_ref()
+                .map(|q| q.id.clone())
+                .unwrap_or_default();
             let progress = session
                 .quiz
                 .as_ref()
@@ -1870,7 +1878,11 @@ fn handle_peer_message(
             maybe_complete_quiz(registry, handle);
             let _ = conn_id;
         }
-        ClientMessage::Clock { t, playing, duration } => {
+        ClientMessage::Clock {
+            t,
+            playing,
+            duration,
+        } => {
             let mut session = handle.lock().expect("session lock");
             let Some(peer) = session.peers.iter().find(|p| p.id == peer_id) else {
                 return;
@@ -1943,11 +1955,7 @@ fn handle_peer_message(
                 "seekBy" => {
                     let d = delta.filter(|d| d.is_finite()).unwrap_or(0.0);
                     session.state.t = (session.state.t + d).max(0.0);
-                    Some(format!(
-                        "{}{}s · {by}",
-                        if d >= 0.0 { "+" } else { "" },
-                        d
-                    ))
+                    Some(format!("{}{}s · {by}", if d >= 0.0 { "+" } else { "" }, d))
                 }
                 "seek" => {
                     if let Some(seek_t) = t.filter(|t| t.is_finite()) {

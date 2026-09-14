@@ -36,6 +36,7 @@ pnpm-debug.log*
 !.env.example
 *.pem
 *.p12
+*.p8
 *.pfx
 
 # Rust / Cargo
@@ -65,3 +66,7 @@ src-tauri/*.key.pub
 
 # Local-only release publish helpers (not versioned)
 scripts/publish-downloads.mjs
+
+# Local secret-scan reports
+gitleaks-report.json
+*.gitleaks.json

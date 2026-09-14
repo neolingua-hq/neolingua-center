@@ -2,8 +2,10 @@
 name = "neolingua-center"
 version = "1.0.0-beta.4"
 description = "Neolingua Center - family host"
-authors = ["Neolingua"]
+authors = ["Martin Catty"]
+license = "AGPL-3.0-only"
 edition = "2021"
+repository = "https://github.com/neolingua-hq/neolingua-center"
 
 [lib]
 name = "neolingua_center_lib"

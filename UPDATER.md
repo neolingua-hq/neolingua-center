@@ -1,17 +1,14 @@
-# Neolingua Center — auto-update (GitHub Releases)
+# Neolingua Center : auto-update (GitHub Releases)
 
 ## Channels
 
 | Canal | Role | Where |
 |-------|------|-------|
-| **First install** | Marketing site download buttons | Cloudflare R2 (`download.neolingua.app`) — see [RELEASE.md](RELEASE.md) and [../website/DOWNLOADS.md](../website/DOWNLOADS.md) |
+| **First install** | Download buttons | Cloudflare R2 (`download.neolingua.app`) - see [RELEASE.md](RELEASE.md) |
 | **In-app updater** | Existing installs | GitHub Releases + static `latest.json` (this document) |
 
 Center uses the official Tauri updater plugin. Signed update artifacts are published
 to GitHub Releases together with a static `latest.json` manifest.
-
-The GitHub repository itself is managed by Terraform (same pattern as Vesta / TTR /
-Deescover): see `../infrastructure/github/`.
 
 The Whisper model is **not** part of the updater payload. It lives in app data and
 is downloaded once from `download.neolingua.app/whisper/ggml-small.bin`.
@@ -28,17 +25,12 @@ If the GitHub owner/repo differs, update `plugins.updater.endpoints` in
 A keypair was generated for this project. The **public** key is already in
 `tauri.conf.json`. The **private** key must never be committed.
 
-Stored in 1Password (personal account, vault **Private**):
-
-- Item: `Neolingua Center - clé signature updater Tauri`
-- Fields: `TAURI_SIGNING_PRIVATE_KEY` (concealed), `pubkey`, notes for GitHub secrets
-
 Local copy (gitignored, optional convenience):
 
 - `.secrets/neolingua-center.key`
 - `.secrets/neolingua-center.key.pub`
 
-If those files are missing, pull from 1Password or regenerate:
+If those files are missing, restore them from your password manager or regenerate:
 
 ```bash
 npm run tauri signer generate -- -w .secrets/neolingua-center.key
@@ -46,13 +38,12 @@ npm run tauri signer generate -- -w .secrets/neolingua-center.key
 
 Then replace `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` with the contents of
 `.secrets/neolingua-center.key.pub` (single line / file content as produced by the CLI).
+Regenerating the key **breaks updates** for existing installs.
 
 Add GitHub repository secrets:
 
-- `TAURI_SIGNING_PRIVATE_KEY` — full contents of `neolingua-center.key`
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — empty string if the key has no password
-
-Losing the private key breaks updates for existing installs.
+- `TAURI_SIGNING_PRIVATE_KEY` - full contents of `neolingua-center.key`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` - empty string if the key has no password
 
 ## Release flow
 
@@ -92,10 +83,9 @@ npm run tauri build
 ## First install vs updater
 
 - **macOS** : Developer ID + notarization (Gatekeeper).
-- **Windows** : pas de certificat Authenticode pour l’instant (coût). Le NSIS
+- **Windows** : pas de certificat Authenticode pour l’instant. Le NSIS
   CI est unsigned ; SmartScreen peut afficher « éditeur inconnu »
-  (Plus d’infos → Exécuter quand même). À revoir plus tard si besoin
-  (Azure Artifact Signing ou OV).
+  (Plus d'infos -> Exécuter quand même).
 
 The Tauri updater verifies minisign signatures of update payloads; it does not
 replace OS code-signing for first install.

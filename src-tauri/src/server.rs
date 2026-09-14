@@ -399,16 +399,12 @@ async fn jam_get_session(
     State(state): State<HttpState>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<Json<SessionView>, (StatusCode, Json<serde_json::Value>)> {
-    state
-        .jam
-        .get_session(&id)
-        .map(Json)
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({ "error": "Session introuvable" })),
-            )
-        })
+    state.jam.get_session(&id).map(Json).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Session introuvable" })),
+        )
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -486,10 +482,7 @@ async fn prepare_video(
     let path = normalize_path(&body.path)?;
     ensure_known_path(&state.db_path, &path).await?;
     let current = state.prep.inspect(&path);
-    if current.status != "ready"
-        && current.status != "processing"
-        && current.status != "queued"
-    {
+    if current.status != "ready" && current.status != "processing" && current.status != "queued" {
         state.prep.enqueue(std::slice::from_ref(&path));
         let prep_reg = Arc::clone(&state.prep);
         let media_path = path.clone();
@@ -783,6 +776,11 @@ mod tests {
         prep.message = None;
         let err = status_from_prep("/m.mkv", &prep);
         assert_eq!(err.video.status, "error");
-        assert!(err.video.message.as_deref().unwrap_or("").contains("illisible"));
+        assert!(err
+            .video
+            .message
+            .as_deref()
+            .unwrap_or("")
+            .contains("illisible"));
     }
 }

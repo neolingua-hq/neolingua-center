@@ -231,7 +231,9 @@ pub fn enrich_catalog(conn: &Connection, api_key: &str) -> Result<(), String> {
         .prepare("SELECT id, title, tmdb_id, original_language FROM catalog_series")
         .map_err(|e| e.to_string())?;
     let series: Vec<(String, String, Option<i32>, Option<String>)> = series_stmt
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -239,7 +241,11 @@ pub fn enrich_catalog(conn: &Connection, api_key: &str) -> Result<(), String> {
 
     for (series_id, title, existing_tmdb, existing_lang) in series {
         let tmdb_id = if let Some(id) = existing_tmdb {
-            if existing_lang.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
+            if existing_lang
+                .as_ref()
+                .map(|s| s.trim().is_empty())
+                .unwrap_or(true)
+            {
                 if let Ok(Some(lang)) = fetch_tv_original_language(&client, conn, key, id) {
                     let _ = conn.execute(
                         "UPDATE catalog_series SET original_language = ?1 WHERE id = ?2",
@@ -328,7 +334,9 @@ pub fn enrich_catalog(conn: &Connection, api_key: &str) -> Result<(), String> {
 
             if let Some(episodes) = payload.episodes {
                 for ep in episodes {
-                    let Some(num) = ep.episode_number else { continue };
+                    let Some(num) = ep.episode_number else {
+                        continue;
+                    };
                     conn.execute(
                         r#"
                         UPDATE catalog_episodes
@@ -363,7 +371,9 @@ pub fn enrich_catalog(conn: &Connection, api_key: &str) -> Result<(), String> {
         .prepare("SELECT id, title, tmdb_id, original_language FROM catalog_movies")
         .map_err(|e| e.to_string())?;
     let movies: Vec<(String, String, Option<i32>, Option<String>)> = movie_stmt
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -371,7 +381,11 @@ pub fn enrich_catalog(conn: &Connection, api_key: &str) -> Result<(), String> {
 
     for (movie_id, title, existing_tmdb, existing_lang) in movies {
         if let Some(id) = existing_tmdb {
-            if existing_lang.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
+            if existing_lang
+                .as_ref()
+                .map(|s| s.trim().is_empty())
+                .unwrap_or(true)
+            {
                 if let Ok(Some(lang)) = fetch_movie_original_language(&client, conn, key, id) {
                     let _ = conn.execute(
                         "UPDATE catalog_movies SET original_language = ?1 WHERE id = ?2",
@@ -453,7 +467,10 @@ pub fn canonicalize_snapshot(
             }
             continue;
         }
-        let query = series.display_title.clone().unwrap_or_else(|| series.title.clone());
+        let query = series
+            .display_title
+            .clone()
+            .unwrap_or_else(|| series.title.clone());
         let Ok(found) = search_tv(&client, conn, key, &query) else {
             unmatched.push(series);
             continue;
@@ -510,7 +527,10 @@ pub fn canonicalize_snapshot(
             }
             continue;
         }
-        let query = movie.display_title.clone().unwrap_or_else(|| movie.title.clone());
+        let query = movie
+            .display_title
+            .clone()
+            .unwrap_or_else(|| movie.title.clone());
         if let Ok(Some(hit)) = search_movie(&client, conn, key, &query) {
             movie.tmdb_id = Some(hit.id);
             movie.display_title = hit.title.clone().or(Some(movie.title.clone()));
@@ -679,4 +699,3 @@ mod tests {
         let _ = std::fs::remove_file(path);
     }
 }
-

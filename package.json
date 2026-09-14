@@ -2,6 +2,12 @@
   "name": "neolingua-center",
   "private": true,
   "version": "1.0.0-beta.4",
+  "license": "AGPL-3.0-only",
+  "author": "Martin Catty",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neolingua-hq/neolingua-center.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,9 +19,8 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "quality": "bash ../.cursor/skills/neo-quality/scripts/audit.sh",
-    "tauri": "tauri",
-    "publish-downloads": "node scripts/publish-downloads.mjs"
+    "quality": "bash scripts/quality.sh",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
