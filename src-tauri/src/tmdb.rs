@@ -88,17 +88,25 @@ fn tmdb_get<T: for<'de> Deserialize<'de>>(
 }
 
 fn cache_get(conn: &Connection, key: &str) -> Result<Option<CacheHit>, String> {
-    let row: Option<String> = conn
+    let row: Option<(String, i64)> = conn
         .query_row(
-            "SELECT payload FROM tmdb_cache WHERE cache_key = ?1",
+            "SELECT payload, CAST(strftime('%s', fetched_at) AS INTEGER) FROM tmdb_cache WHERE cache_key = ?1",
             params![key],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()
         .map_err(|e| e.to_string())?;
-    let Some(payload) = row else {
+    let Some((payload, fetched_at)) = row else {
         return Ok(None);
     };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    if now.saturating_sub(fetched_at) > CACHE_TTL_SECS {
+        let _ = conn.execute("DELETE FROM tmdb_cache WHERE cache_key = ?1", params![key]);
+        return Ok(None);
+    }
     if payload == CACHE_MISS {
         return Ok(Some(CacheHit::Miss));
     }
@@ -433,7 +441,6 @@ pub fn enrich_catalog(conn: &Connection, api_key: &str) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(50));
     }
 
-    let _ = CACHE_TTL_SECS;
     Ok(())
 }
 

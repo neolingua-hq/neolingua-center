@@ -1,5 +1,6 @@
 mod cache;
 mod db;
+mod error;
 mod jam;
 mod library;
 mod network;
@@ -209,13 +210,19 @@ async fn cancel_prepare(
 #[tauri::command]
 async fn pick_media_directory(app: AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
+    use tokio::sync::oneshot;
 
-    let picked = app
-        .dialog()
+    let (tx, rx) = oneshot::channel();
+    app.dialog()
         .file()
         .set_title("Dossier des vidéos")
-        .blocking_pick_folder();
+        .pick_folder(move |folder| {
+            let _ = tx.send(folder);
+        });
 
+    let picked = rx
+        .await
+        .map_err(|_| "Sélection du dossier interrompue.".to_string())?;
     Ok(picked.map(|p| p.to_string()))
 }
 
@@ -224,7 +231,7 @@ async fn pick_media_directory(app: AppHandle) -> Result<Option<String>, String> 
 async fn open_watch_launcher(app: AppHandle, url: String) -> Result<(), String> {
     use std::hash::{Hash, Hasher};
 
-    let trimmed = url.trim();
+    let trimmed = url.trim().to_string();
     if !(trimmed.starts_with("http://") || trimmed.starts_with("https://")) {
         return Err("URL de lecture invalide.".into());
     }
@@ -234,7 +241,6 @@ async fn open_watch_launcher(app: AppHandle, url: String) -> Result<(), String> 
         .app_data_dir()
         .map_err(|e| format!("Dossier app introuvable : {e}"))?;
     let dir = app_data.join("cache").join("launchers");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Impossible de créer le lanceur : {e}"))?;
 
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     trimmed.hash(&mut hasher);
@@ -246,6 +252,7 @@ async fn open_watch_launcher(app: AppHandle, url: String) -> Result<(), String> 
         .replace('"', "&quot;")
         .replace('<', "&lt;")
         .replace('>', "&gt;");
+    let json = serde_json::to_string(&trimmed).unwrap_or_else(|_| "\"\"".into());
     let html = format!(
         r#"<!DOCTYPE html>
 <html lang="fr">
@@ -261,20 +268,31 @@ async fn open_watch_launcher(app: AppHandle, url: String) -> Result<(), String> 
 </html>
 "#,
         escaped = escaped,
-        json = serde_json::to_string(trimmed).unwrap_or_else(|_| "\"\"".into()),
+        json = json,
     );
-    std::fs::write(&path, html).map_err(|e| format!("Impossible d’écrire le lanceur : {e}"))?;
 
-    // Open the launcher file with the OS default handler (browser).
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("Impossible de créer le lanceur : {e}"))?;
+    tokio::fs::write(&path, html)
+        .await
+        .map_err(|e| format!("Impossible d’écrire le lanceur : {e}"))?;
+
     #[cfg(target_os = "macos")]
     {
-        let status = std::process::Command::new("open")
-            .arg(&path)
-            .status()
-            .map_err(|e| format!("Impossible d’ouvrir le lanceur : {e}"))?;
-        if !status.success() {
-            return Err("Impossible d’ouvrir le lanceur.".into());
-        }
+        let path_for_open = path.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let status = std::process::Command::new("open")
+                .arg(&path_for_open)
+                .status()
+                .map_err(|e| format!("Impossible d’ouvrir le lanceur : {e}"))?;
+            if !status.success() {
+                return Err("Impossible d’ouvrir le lanceur.".into());
+            }
+            Ok::<(), String>(())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -287,13 +305,7 @@ async fn open_watch_launcher(app: AppHandle, url: String) -> Result<(), String> 
 }
 
 fn enrich_prep(snap: &mut CatalogSnapshot, prep: &PrepRegistry) {
-    for series in &mut snap.series {
-        for season in &mut series.seasons {
-            for episode in &mut season.episodes {
-                episode.prep = prep.inspect(&episode.path);
-            }
-        }
-    }
+    cache::enrich_catalog_prep(snap, prep);
 }
 
 fn clamp_port(port: u32) -> u16 {
@@ -315,8 +327,7 @@ pub fn run() {
             let path = db::db_path(app.handle())?;
             let conn = db::prepare_database(&path)?;
             let settings = db::load_settings(&conn)?;
-            drop(conn);
-            app.manage(Mutex::new(DbState { path: path.clone() }));
+            app.manage(Mutex::new(DbState::from_prepared(path.clone(), conn)));
 
             let app_data = path
                 .parent()

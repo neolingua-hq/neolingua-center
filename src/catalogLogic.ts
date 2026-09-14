@@ -8,9 +8,9 @@ import {
   type PresenceSession,
   type WizardStep,
 } from "./settings";
-import { escapeHtml } from "./updateLogic";
+import { escapeHtml, safeMediaUrl, slugify } from "./shared/html";
 
-export { escapeHtml };
+export { escapeHtml, safeMediaUrl, slugify };
 
 export type CenterRoute =
   | { view: "setup"; step: WizardStep }
@@ -23,16 +23,6 @@ export function folderDisplayName(path: string): string {
   const trimmed = path.replace(/[/\\]+$/, "");
   const parts = trimmed.split(/[/\\]/).filter(Boolean);
   return parts[parts.length - 1] || path;
-}
-
-export function slugify(text: string): string {
-  const slug = text
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "item";
 }
 
 export function buildSlugById<T extends { id: string; tmdbId?: number | null }>(

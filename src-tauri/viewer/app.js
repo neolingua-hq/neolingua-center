@@ -6,7 +6,9 @@ import {
   escapeHtml,
   formatTime,
   parseVtt,
+  safeMediaUrl,
 } from "./media-utils.js";
+import { slugify as slugifyShared, displayName as displayNameShared } from "./shared.js";
 import { createChromeController } from "./player-chrome.js";
 import { PRESENCE_INTERVAL_MS, viewerClientId } from "./presence-client.js";
 
@@ -473,23 +475,12 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-function displayName(item) {
-  return (item.displayTitle && item.displayTitle.trim()) || item.title;
-}
+// Use shared helpers (imported at top)
+const displayName = displayNameShared;
+const slugify = slugifyShared;
 
 function findSeries(id) {
   return catalog?.series.find((s) => s.id === id);
-}
-
-/** @param {string} text */
-function slugify(text) {
-  const slug = String(text || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "item";
 }
 
 /**
@@ -774,8 +765,9 @@ function applyLocationFromHistory() {
 }
 
 function posterHtml(url, title) {
-  if (url) {
-    return `<span class="poster-frame"><img src="${escapeHtml(url)}" alt="" loading="lazy" /></span>`;
+  const safeUrl = safeMediaUrl(url);
+  if (safeUrl) {
+    return `<span class="poster-frame"><img src="${escapeHtml(safeUrl)}" alt="" loading="lazy" /></span>`;
   }
   const letter = (title || "?").trim().slice(0, 1).toUpperCase() || "?";
   return `<span class="poster-frame"><span class="poster-fallback">${escapeHtml(letter)}</span></span>`;

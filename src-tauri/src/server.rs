@@ -1,4 +1,4 @@
-use crate::cache::{EpisodePrep, PrepRegistry};
+use crate::cache::{self, EpisodePrep, PrepRegistry, PrepStatus, SubTrackSource};
 use crate::db;
 use crate::jam::{self, JamRegistry, SessionPublic, SessionView};
 use crate::presence::{PresenceHeartbeat, PresenceRegistry, PresenceSnapshot};
@@ -77,7 +77,7 @@ struct JobStateBody {
 #[serde(rename_all = "camelCase")]
 struct TrackBody {
     status: String,
-    source: String,
+    source: SubTrackSource,
 }
 
 #[derive(Debug, Serialize)]
@@ -237,20 +237,18 @@ impl ServerController {
 }
 
 fn persist_server_port(db_path: &PathBuf, port: u16) {
-    let Ok(conn) = db::open_connection(db_path) else {
-        return;
-    };
-    if db::run_migrations(&conn).is_err() {
-        return;
+    let result = (|| -> Result<(), String> {
+        let conn = db::open_migrated(db_path)?;
+        let mut settings = db::load_settings(&conn)?;
+        if settings.server_port == u32::from(port) {
+            return Ok(());
+        }
+        settings.server_port = u32::from(port);
+        db::save_settings(&conn, &settings)
+    })();
+    if let Err(err) = result {
+        eprintln!("neolingua-center: failed to persist server port {port}: {err}");
     }
-    let Ok(mut settings) = db::load_settings(&conn) else {
-        return;
-    };
-    if settings.server_port == u32::from(port) {
-        return;
-    }
-    settings.server_port = u32::from(port);
-    let _ = db::save_settings(&conn, &settings);
 }
 
 async fn bind_lan_listener(preferred: u16) -> Result<(TcpListener, u16), String> {
@@ -325,6 +323,9 @@ async fn run_http_server(
         .route("/api/video", get(video))
         .route("/api/subtitles.vtt", get(subtitles_vtt))
         .fallback_service(static_files)
+        // Family LAN host: any device on the local network may open the viewer
+        // (TV, phone, laptop). Origins are not a fixed allowlist. The trust
+        // boundary is the LAN itself (no Internet exposure assumed).
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -391,7 +392,7 @@ async fn jam_create_session(
         .quiz_interval_seconds
         .filter(|v| v.is_finite())
         .unwrap_or(60.0);
-    let created = state.jam.create_session(quiz_mode, quiz_interval_seconds);
+    let created = state.jam.create_session(quiz_mode, quiz_interval_seconds).await;
     (StatusCode::CREATED, Json(created))
 }
 
@@ -399,7 +400,7 @@ async fn jam_get_session(
     State(state): State<HttpState>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<Json<SessionView>, (StatusCode, Json<serde_json::Value>)> {
-    state.jam.get_session(&id).map(Json).ok_or_else(|| {
+    state.jam.get_session(&id).await.map(Json).ok_or_else(|| {
         (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": "Session introuvable" })),
@@ -423,8 +424,7 @@ async fn public_settings(
 ) -> Result<Json<PublicSettingsBody>, (StatusCode, String)> {
     let path = state.db_path.clone();
     let settings = tauri::async_runtime::spawn_blocking(move || {
-        let conn = db::open_connection(&path)?;
-        db::run_migrations(&conn)?;
+        let conn = db::open_migrated(&path)?;
         db::load_settings(&conn)
     })
     .await
@@ -447,21 +447,14 @@ async fn library(
     let path = state.db_path.clone();
     let prep = Arc::clone(&state.prep);
     let mut snapshot = tauri::async_runtime::spawn_blocking(move || {
-        let conn = db::open_connection(&path)?;
-        db::run_migrations(&conn)?;
+        let conn = db::open_migrated(&path)?;
         db::load_catalog(&conn)
     })
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
-    for series in &mut snapshot.series {
-        for season in &mut series.seasons {
-            for episode in &mut season.episodes {
-                episode.prep = prep.inspect(&episode.path);
-            }
-        }
-    }
+    cache::enrich_catalog_prep(&mut snapshot, &prep);
     Ok(Json(snapshot))
 }
 
@@ -482,7 +475,10 @@ async fn prepare_video(
     let path = normalize_path(&body.path)?;
     ensure_known_path(&state.db_path, &path).await?;
     let current = state.prep.inspect(&path);
-    if current.status != "ready" && current.status != "processing" && current.status != "queued" {
+    if current.status != PrepStatus::Ready
+        && current.status != PrepStatus::Processing
+        && current.status != PrepStatus::Queued
+    {
         state.prep.enqueue(std::slice::from_ref(&path));
         let prep_reg = Arc::clone(&state.prep);
         let media_path = path.clone();
@@ -504,8 +500,7 @@ async fn purge_cache(
     ensure_known_path(&state.db_path, &path).await?;
     let db_path = state.db_path.clone();
     let allowed = tauri::async_runtime::spawn_blocking(move || {
-        let conn = db::open_connection(&db_path)?;
-        db::run_migrations(&conn)?;
+        let conn = db::open_migrated(&db_path)?;
         Ok::<bool, String>(db::load_settings(&conn)?.purge_cache_after_watch)
     })
     .await
@@ -569,9 +564,12 @@ async fn subtitles_vtt(
 
 fn status_from_prep(path: &str, prep: &EpisodePrep) -> StatusBody {
     // Prefer job phase over on-disk video: remux may finish while Whisper is still running.
-    let video_status = if prep.status == "processing" || prep.status == "queued" {
+    let video_status = if matches!(
+        prep.status,
+        PrepStatus::Processing | PrepStatus::Queued
+    ) {
         "processing"
-    } else if prep.status == "error" {
+    } else if prep.status == PrepStatus::Error {
         "error"
     } else if prep.video {
         "ready"
@@ -591,7 +589,13 @@ fn status_from_prep(path: &str, prep: &EpisodePrep) -> StatusBody {
         .message
         .as_deref()
         .map(str::trim)
-        .filter(|m| !m.is_empty() && prep.status != "processing" && prep.status != "queued")
+        .filter(|m| {
+            !m.is_empty()
+                && !matches!(
+                    prep.status,
+                    PrepStatus::Processing | PrepStatus::Queued
+                )
+        })
         .unwrap_or(default_message);
     StatusBody {
         id: path.to_string(),
@@ -601,7 +605,7 @@ fn status_from_prep(path: &str, prep: &EpisodePrep) -> StatusBody {
                 let raw = prep.message.clone().unwrap_or_default();
                 let trimmed = raw.trim();
                 if trimmed.is_empty() {
-                    if prep.status == "error" {
+                    if prep.status == PrepStatus::Error {
                         Some("Préparation impossible (fichier illisible ou corrompu).".into())
                     } else {
                         None
@@ -617,11 +621,11 @@ fn status_from_prep(path: &str, prep: &EpisodePrep) -> StatusBody {
             message: subs_message.into(),
             en: TrackBody {
                 status: if en_ready { "ready" } else { "idle" }.into(),
-                source: prep.en_source.clone(),
+                source: prep.en_source,
             },
             fr: TrackBody {
                 status: if fr_ready { "ready" } else { "idle" }.into(),
-                source: prep.fr_source.clone(),
+                source: prep.fr_source,
             },
         },
     }
@@ -639,8 +643,7 @@ async fn ensure_known_path(db_path: &Path, path: &str) -> Result<(), (StatusCode
     let db_path = db_path.to_path_buf();
     let media_path = path.to_string();
     let known = tauri::async_runtime::spawn_blocking(move || {
-        let conn = db::open_connection(&db_path)?;
-        db::run_migrations(&conn)?;
+        let conn = db::open_migrated(&db_path)?;
         db::is_known_media_path(&conn, &media_path)
     })
     .await
@@ -690,11 +693,16 @@ async fn stream_file(
         headers_mut.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
         headers_mut.insert(
             header::CONTENT_LENGTH,
-            HeaderValue::from_str(&take.to_string()).unwrap(),
+            header_value_u64(take)?,
         );
         headers_mut.insert(
             header::CONTENT_RANGE,
-            HeaderValue::from_str(&format!("bytes {start}-{end}/{file_size}")).unwrap(),
+            HeaderValue::from_str(&format!("bytes {start}-{end}/{file_size}")).map_err(|_| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "En-tête Content-Range invalide".into(),
+                )
+            })?,
         );
         return Ok(response);
     }
@@ -708,30 +716,58 @@ async fn stream_file(
     let headers_mut = response.headers_mut();
     headers_mut.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
     headers_mut.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
-    headers_mut.insert(
-        header::CONTENT_LENGTH,
-        HeaderValue::from_str(&file_size.to_string()).unwrap(),
-    );
+    headers_mut.insert(header::CONTENT_LENGTH, header_value_u64(file_size)?);
     Ok(response)
 }
 
+fn header_value_u64(value: u64) -> Result<HeaderValue, (StatusCode, String)> {
+    HeaderValue::from_str(&value.to_string()).map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "En-tête HTTP numérique invalide".into(),
+        )
+    })
+}
+
+/// Parse a single RFC 7233 bytes range (`bytes=start-end`, `bytes=start-`, or suffix `bytes=-N`).
 fn parse_byte_range(header: &str, file_size: u64) -> Option<(u64, u64)> {
+    if file_size == 0 {
+        return None;
+    }
     let header = header.trim();
     if !header.starts_with("bytes=") {
         return None;
     }
     let spec = &header["bytes=".len()..];
+    // Only one range is supported (video players send a single range).
+    if spec.contains(',') {
+        return None;
+    }
     let (start_raw, end_raw) = spec.split_once('-')?;
-    let start = if start_raw.is_empty() {
-        0
-    } else {
-        start_raw.parse().ok()?
-    };
+    let last = file_size - 1;
+
+    if start_raw.is_empty() {
+        // Suffix form: last N bytes (`bytes=-500`).
+        let n: u64 = end_raw.parse().ok()?;
+        if n == 0 {
+            return None;
+        }
+        let start = file_size.saturating_sub(n);
+        return Some((start, last));
+    }
+
+    let start: u64 = start_raw.parse().ok()?;
+    if start > last {
+        return None;
+    }
     let end = if end_raw.is_empty() {
-        file_size.saturating_sub(1)
+        last
     } else {
-        end_raw.parse().ok()?
+        end_raw.parse::<u64>().ok()?.min(last)
     };
+    if end < start {
+        return None;
+    }
     Some((start, end))
 }
 
@@ -743,10 +779,15 @@ mod tests {
     fn parse_byte_range_suffix_and_open_end() {
         assert_eq!(parse_byte_range("bytes=0-", 1000), Some((0, 999)));
         assert_eq!(parse_byte_range("bytes=100-199", 1000), Some((100, 199)));
-        assert_eq!(parse_byte_range("bytes=-500", 1000), Some((0, 500)));
+        assert_eq!(parse_byte_range("bytes=-500", 1000), Some((500, 999)));
+        assert_eq!(parse_byte_range("bytes=-1000", 1000), Some((0, 999)));
+        assert_eq!(parse_byte_range("bytes=-1", 1000), Some((999, 999)));
+        assert_eq!(parse_byte_range("bytes=-0", 1000), None);
+        assert_eq!(parse_byte_range("bytes=1000-", 1000), None);
         assert_eq!(parse_byte_range("bytes=", 1000), None);
         assert_eq!(parse_byte_range("unit=0-1", 1000), None);
         assert_eq!(parse_byte_range("", 1000), None);
+        assert_eq!(parse_byte_range("bytes=0-0", 0), None);
     }
 
     #[test]
@@ -758,12 +799,12 @@ mod tests {
     #[test]
     fn status_from_prep_prefers_job_phase() {
         let mut prep = EpisodePrep::default();
-        prep.status = "processing".into();
+        prep.status = PrepStatus::Processing;
         prep.video = true;
         prep.subs_en = true;
         prep.subs_fr = false;
-        prep.en_source = "native".into();
-        prep.fr_source = "missing".into();
+        prep.en_source = SubTrackSource::Native;
+        prep.fr_source = SubTrackSource::Missing;
         prep.message = Some("Whisper…".into());
         let body = status_from_prep("/m.mkv", &prep);
         assert_eq!(body.video.status, "processing");
@@ -771,7 +812,7 @@ mod tests {
         assert_eq!(body.subtitles.en.status, "ready");
         assert_eq!(body.subtitles.fr.status, "idle");
 
-        prep.status = "error".into();
+        prep.status = PrepStatus::Error;
         prep.video = false;
         prep.message = None;
         let err = status_from_prep("/m.mkv", &prep);

@@ -1,6 +1,8 @@
+use crate::error::{AppError, AppResult};
 use crate::scan::{CatalogMovie, CatalogSeason, CatalogSeries, CatalogSnapshot};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 /// Target schema version after migrations have run (single baseline).
@@ -76,19 +78,52 @@ pub struct CatalogOverride {
 
 pub struct DbState {
     pub path: PathBuf,
+    /// Live connection for short Tauri/UI reads. Long jobs may open their own
+    /// connection via [`open_migrated`] so they do not hold this lock.
+    conn: Mutex<Connection>,
 }
 
-pub fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+impl DbState {
+    pub fn from_prepared(path: PathBuf, conn: Connection) -> Self {
+        Self {
+            path,
+            conn: Mutex::new(conn),
+        }
+    }
+}
+
+pub fn db_path(app: &AppHandle) -> AppResult<PathBuf> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::msg(e.to_string()))?;
+    std::fs::create_dir_all(&dir)?;
     Ok(dir.join("neolingua.sqlite"))
 }
 
-pub fn open_connection(path: &PathBuf) -> Result<Connection, String> {
-    let conn = Connection::open(path).map_err(|e| e.to_string())?;
-    conn.execute_batch("PRAGMA foreign_keys = ON;")
-        .map_err(|e| e.to_string())?;
+pub fn open_connection(path: &PathBuf) -> AppResult<Connection> {
+    let conn = Connection::open(path)?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     Ok(conn)
+}
+
+/// Open a connection and run migrations only when the schema stamp is missing
+/// or outdated (avoids replaying CREATE IF NOT EXISTS on every request).
+pub fn open_migrated(path: &PathBuf) -> AppResult<Connection> {
+    let conn = open_connection(path)?;
+    ensure_migrated(&conn)?;
+    Ok(conn)
+}
+
+fn schema_is_current(conn: &Connection) -> bool {
+    schema_version(conn).ok() == Some(SCHEMA_VERSION)
+}
+
+pub fn ensure_migrated(conn: &Connection) -> AppResult<()> {
+    if schema_is_current(conn) {
+        return Ok(());
+    }
+    run_migrations(conn)
 }
 
 fn schema_version(conn: &Connection) -> Result<i32, String> {
@@ -213,32 +248,31 @@ fn migrate_baseline(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-pub fn run_migrations(conn: &Connection) -> Result<(), String> {
+pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS schema_migrations (
           version INTEGER PRIMARY KEY NOT NULL
         );
         "#,
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
-    let current = schema_version(conn)?;
+    let current = schema_version(conn).map_err(AppError::msg)?;
     if current == 0 {
-        migrate_baseline(conn)?;
+        migrate_baseline(conn).map_err(AppError::msg)?;
     }
 
-    let current = schema_version(conn)?;
+    let current = schema_version(conn).map_err(AppError::msg)?;
     if current != SCHEMA_VERSION {
-        return Err(format!(
+        return Err(AppError::msg(format!(
             "incomplete migrations: schema {current}, expected {SCHEMA_VERSION}"
-        ));
+        )));
     }
 
     Ok(())
 }
 
-fn remove_db_files(path: &Path) -> Result<(), String> {
+fn remove_db_files(path: &Path) -> AppResult<()> {
     for suffix in ["", "-wal", "-shm"] {
         let candidate = if suffix.is_empty() {
             path.to_path_buf()
@@ -248,7 +282,7 @@ fn remove_db_files(path: &Path) -> Result<(), String> {
         match std::fs::remove_file(&candidate) {
             Ok(()) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => return Err(err.to_string()),
+            Err(err) => return Err(err.into()),
         }
     }
     Ok(())
@@ -257,11 +291,11 @@ fn remove_db_files(path: &Path) -> Result<(), String> {
 /// Open the app database on the single baseline schema.
 /// Pre-release: any other schema stamp is treated as obsolete local state and
 /// the SQLite file is deleted then recreated (no migration chain).
-pub fn prepare_database(path: &PathBuf) -> Result<Connection, String> {
+pub fn prepare_database(path: &PathBuf) -> AppResult<Connection> {
     let conn = open_connection(path)?;
     match run_migrations(&conn) {
         Ok(()) => Ok(conn),
-        Err(err) if err.starts_with("incomplete migrations:") => {
+        Err(err) if err.to_string().starts_with("incomplete migrations:") => {
             drop(conn);
             remove_db_files(path)?;
             let conn = open_connection(path)?;
@@ -799,8 +833,7 @@ pub fn with_connection<F, T>(state: &DbState, f: F) -> Result<T, String>
 where
     F: FnOnce(&Connection) -> Result<T, String>,
 {
-    let conn = open_connection(&state.path)?;
-    run_migrations(&conn)?;
+    let conn = state.conn.lock().map_err(AppError::from)?;
     f(&conn)
 }
 

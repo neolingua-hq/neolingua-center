@@ -89,7 +89,7 @@ export async function loadServerStatus(): Promise<ServerStatus> {
 
 export type PresenceSession = {
   clientId: string;
-  mode: "solo" | "jam" | string;
+  mode: "solo" | "jam";
   title?: string | null;
   path?: string | null;
   playing: boolean;
@@ -104,10 +104,17 @@ export async function loadPresence(): Promise<PresenceSnapshot> {
   return invoke<PresenceSnapshot>("get_presence");
 }
 
-export type SubTrackSource = "native" | "generated" | "missing" | string;
+export type SubTrackSource = "native" | "generated" | "missing";
+export type PrepStatus =
+  | "missing"
+  | "partial"
+  | "ready"
+  | "queued"
+  | "processing"
+  | "error";
 
 export type EpisodePrep = {
-  status: "missing" | "partial" | "ready" | "queued" | "processing" | "error" | string;
+  status: PrepStatus;
   video: boolean;
   subsEn: boolean;
   subsFr: boolean;
@@ -177,10 +184,6 @@ export async function loadCatalog(): Promise<CatalogSnapshot> {
 
 export async function scanCatalog(): Promise<CatalogSnapshot> {
   return invoke<CatalogSnapshot>("scan_catalog");
-}
-
-export async function checkLibrary(): Promise<CatalogSnapshot> {
-  return invoke<CatalogSnapshot>("check_library");
 }
 
 export async function prepareEpisode(path: string): Promise<EpisodePrep> {
