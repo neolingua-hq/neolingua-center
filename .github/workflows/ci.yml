@@ -37,6 +37,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Fetch sidecars
+        run: npm run fetch-binaries
+
       - name: Typecheck
         run: npx --no-install tsc --noEmit
 
