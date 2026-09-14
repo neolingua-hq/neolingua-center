@@ -1,11 +1,11 @@
-# Neolingua Center : release checklist
+# Neolingua Center: release checklist
 
 First install (marketing site) and in-app updates use **two different channels**.
 
-| Canal | Destination | Artefacts |
-|-------|-------------|-----------|
-| Site / première install | R2 `download.neolingua.app` | macOS `.dmg`, Windows NSIS `.exe` |
-| Updater in-app | GitHub Releases + `latest.json` | `.app.tar.gz` (+ `.sig`), NSIS `.exe` (+ `.sig`) |
+| Channel | Destination | Artifacts |
+|---------|-------------|-----------|
+| Site / first install | R2 `download.neolingua.app` | macOS `.dmg`, Windows NSIS `.exe` |
+| In-app updater | GitHub Releases + `latest.json` | `.app.tar.gz` (+ `.sig`), NSIS `.exe` (+ `.sig`) |
 
 Details: [UPDATER.md](UPDATER.md).
 

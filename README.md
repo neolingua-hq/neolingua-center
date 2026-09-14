@@ -1,63 +1,61 @@
 # Neolingua Center
 
-Hôte familial : bibliothèque locale, serveur LAN embarqué, lecture sur TV et
-navigateurs du réseau. Gratuit, [AGPL-3.0](LICENSE).
+Home media host: local library, embedded LAN server, playback on TVs and
+browsers on your network. Free, [AGPL-3.0](LICENSE).
 
-Téléchargements : https://download.neolingua.app
+Downloads: https://download.neolingua.app
 
-Le nom et le logo Neolingua restent une marque. Voir [TRADEMARKS.md](TRADEMARKS.md).
+The Neolingua name and logo remain trademarks. See [TRADEMARKS.md](TRADEMARKS.md).
 
-## Prérequis
+## Prerequisites
 
 - Node.js 20+
 - Rust (`rustup`)
-- macOS ou Windows
+- macOS or Windows
 
-`ffmpeg`, `ffprobe` et `whisper-cli` sont embarqués. Au premier
-`tauri dev` / `tauri build`, `npm run fetch-binaries` les télécharge dans
-`src-tauri/binaries/` (gitignorés). Le modèle de transcription
-(`ggml-small.bin`, ~465 Mo) n’est **pas** dans l’installeur : il est
-téléchargé une fois dans les données de l’app, au premier épisode qui a
-vraiment besoin d’une transcription.
+`ffmpeg`, `ffprobe`, and `whisper-cli` are bundled. On the first
+`tauri dev` / `tauri build`, `npm run fetch-binaries` downloads them into
+`src-tauri/binaries/` (gitignored). The transcription model
+(`ggml-small.bin`, ~465 MB) is **not** in the installer: it is downloaded
+once into app data, on the first episode that actually needs transcription.
 
-## Développement
+## Development
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-Au premier lancement, l’assistant de configuration s’ouvre. Les choix sont
-persistés dans SQLite :
+On first launch, the setup wizard opens. Choices are persisted in SQLite:
 
-- macOS : `~/Library/Application Support/fr.neolingua.center/neolingua.sqlite`
-- Windows : `%APPDATA%\fr.neolingua.center\neolingua.sqlite`
+- macOS: `~/Library/Application Support/fr.neolingua.center/neolingua.sqlite`
+- Windows: `%APPDATA%\fr.neolingua.center\neolingua.sqlite`
 
 ## Scripts
 
-| Commande | Description |
-|----------|-------------|
-| `npm run fetch-binaries` | Télécharge ffmpeg/ffprobe/whisper-cli (pas le modèle) |
-| `npm run publish-whisper-model` | Publie `ggml-small.bin` sur R2 s’il n’y est pas déjà |
-| `npm run dev` | Vite seul (port 1422) |
-| `npm run tauri dev` | App desktop + hot reload |
-| `npm run tauri build` | Build release (DMG sur macOS, NSIS `.exe` sur Windows) |
-| `npm test` | Tests unitaires (Vitest + `cargo test`) |
-| `npm run test:unit` | Vitest seul |
-| `npm run test:rust` | Tests Rust (`src-tauri`) |
+| Command | Description |
+|---------|-------------|
+| `npm run fetch-binaries` | Download ffmpeg/ffprobe/whisper-cli (not the model) |
+| `npm run publish-whisper-model` | Publish `ggml-small.bin` to R2 if it is not already there |
+| `npm run dev` | Vite only (port 1422) |
+| `npm run tauri dev` | Desktop app + hot reload |
+| `npm run tauri build` | Release build (DMG on macOS, NSIS `.exe` on Windows) |
+| `npm test` | Unit tests (Vitest + `cargo test`) |
+| `npm run test:unit` | Vitest only |
+| `npm run test:rust` | Rust tests (`src-tauri`) |
 | `npm run lint` | tsc, oxlint (Vite/TS), rustfmt, Clippy |
 | `npm run quality` | lint + tests |
 
-Outils Rust (une fois) :
+Rust tooling (once):
 
 ```bash
 rustup component add rustfmt clippy
 ```
 
-## Licence et source
+## License and source
 
-Copyright (C) 2026 Martin Catty. GNU Affero GPL v3 uniquement. Le code
-source correspondant à chaque release est le tag Git du même numéro de
-version : https://github.com/neolingua-hq/neolingua-center
+Copyright (C) 2026 Martin Catty. GNU Affero GPL v3 only. The corresponding
+source for each release is the Git tag with the same version number:
+https://github.com/neolingua-hq/neolingua-center
 
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) et [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).

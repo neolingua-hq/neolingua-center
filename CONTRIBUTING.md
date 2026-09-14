@@ -1,7 +1,6 @@
-# Contribuer
+# Contributing
 
-Les PR vont vers `develop`. Une branche `feat/…`, `fix/…` ou `chore/…` par
-sujet.
+PRs target `develop`. One `feat/…`, `fix/…`, or `chore/…` branch per topic.
 
 ## Dev
 
@@ -10,14 +9,14 @@ npm install
 npm run tauri dev
 ```
 
-Au premier lancement, `ffmpeg`, `ffprobe` et `whisper-cli` sont téléchargés
-dans `src-tauri/binaries/` (gitignorés). Ne les commite pas. Ne commite pas
-non plus `ggml-small.bin` ni quoi que ce soit sous `.secrets/`.
+On first run, `ffmpeg`, `ffprobe`, and `whisper-cli` are downloaded into
+`src-tauri/binaries/` (gitignored). Do not commit them. Do not commit
+`ggml-small.bin` either, or anything under `.secrets/`.
 
-`npm install` installe le hook git pre-commit (husky). Il lance rustfmt +
-Clippy sur les `.rs` stagés, et `tsc` + oxlint sur le front Vite / TypeScript
-(et le JS du viewer, hors `*.min.js`). Clippy a besoin des sidecars :
-`npm run fetch-binaries` une fois.
+`npm install` installs the git pre-commit hook (husky). It runs rustfmt +
+Clippy on staged `.rs` files, and `tsc` + oxlint on the Vite / TypeScript
+front end (and viewer JS, excluding `*.min.js`). Clippy needs the sidecars:
+run `npm run fetch-binaries` once.
 
 ## Tests
 
@@ -27,11 +26,11 @@ npm run lint
 npm run quality
 ```
 
-`lint` : tsc, oxlint, rustfmt `--check`, Clippy (`-D warnings`).
-`quality` : lint + tests.
+`lint`: tsc, oxlint, rustfmt `--check`, Clippy (`-D warnings`).
+`quality`: lint + tests.
 
 ## Secrets
 
-Pas de clés, tokens, `.p12`, `.p8` ou `.env` dans git. Les noms de variables
-(`R2_SECRET_ACCESS_KEY`, etc.) dans les docs et le workflow, oui. Les valeurs,
-non.
+No keys, tokens, `.p12`, `.p8`, or `.env` files in git. Variable names
+(`R2_SECRET_ACCESS_KEY`, and so on) in docs and the workflow are fine. Values
+are not.
