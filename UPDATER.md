@@ -1,9 +1,9 @@
-# Neolingua Center : auto-update (GitHub Releases)
+# Neolingua Center: auto-update (GitHub Releases)
 
 ## Channels
 
-| Canal | Role | Where |
-|-------|------|-------|
+| Channel | Role | Where |
+|---------|------|-------|
 | **First install** | Download buttons | Cloudflare R2 (`download.neolingua.app`) - see [RELEASE.md](RELEASE.md) |
 | **In-app updater** | Existing installs | GitHub Releases + static `latest.json` (this document) |
 
@@ -74,7 +74,7 @@ npm run tauri build
 - Background check at boot, then every hour while Center stays open
 - Status bar (next to version): orange download icon when outdated; click version or
   icon to check / reopen the update banner
-- Banner under the header:
+- Banner under the header (French UI copy today):
   - Available: **Plus tard** / **Au prochain démarrage** / **Mettre à jour**
   - Scheduled: **Annuler** / **Mettre à jour maintenant** (auto-install on next launch)
 - Before relaunch, the LAN HTTP server is stopped (`stop_lan_server`)
@@ -82,10 +82,9 @@ npm run tauri build
 
 ## First install vs updater
 
-- **macOS** : Developer ID + notarization (Gatekeeper).
-- **Windows** : pas de certificat Authenticode pour l’instant. Le NSIS
-  CI est unsigned ; SmartScreen peut afficher « éditeur inconnu »
-  (Plus d'infos -> Exécuter quand même).
+- **macOS**: Developer ID + notarization (Gatekeeper).
+- **Windows**: no Authenticode certificate yet. The CI NSIS build is unsigned;
+  SmartScreen may show "Unknown publisher" (More info -> Run anyway).
 
 The Tauri updater verifies minisign signatures of update payloads; it does not
 replace OS code-signing for first install.
@@ -94,5 +93,5 @@ replace OS code-signing for first install.
 
 - Install a release build (macOS `/Applications`, Windows NSIS)
 - Publish a higher version tag with artifacts + `latest.json`
-- Open Center and confirm the banner, or use Vérifier les mises à jour
+- Open Center and confirm the banner, or use **Vérifier les mises à jour**
 - After install, confirm the LAN viewer still starts on the configured port

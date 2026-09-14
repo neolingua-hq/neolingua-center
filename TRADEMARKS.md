@@ -1,12 +1,12 @@
-# Marques
+# Trademarks
 
-Le code de Neolingua Center est sous GNU AGPL-3.0. La licence **ne** donne
-**pas** le droit d’utiliser les marques suivantes :
+Neolingua Center source code is licensed under GNU AGPL-3.0. That license does
+**not** grant rights to use the following marks:
 
 - Neolingua
 - Neolingua Center
-- le logo Neolingua
-- les domaines `neolingua.app` et `download.neolingua.app`
+- the Neolingua logo
+- the domains `neolingua.app` and `download.neolingua.app`
 
-Un fork peut reprendre le code sous AGPL. Il doit choisir un **autre nom** et
-un autre habillage, sauf accord écrit.
+A fork may reuse the code under AGPL. It must pick a **different name** and
+different branding, unless you have written permission.
