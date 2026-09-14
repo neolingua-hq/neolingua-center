@@ -287,7 +287,10 @@ pub(super) fn audio_lang_prefixes(lang: &str) -> &'static [&'static str] {
     }
 }
 
-pub(super) fn probe_audio_index_matching_lang(source: &Path, lang: &str) -> Result<Option<usize>, String> {
+pub(super) fn probe_audio_index_matching_lang(
+    source: &Path,
+    lang: &str,
+) -> Result<Option<usize>, String> {
     let prefixes = audio_lang_prefixes(lang);
     let streams = probe_streams(source)?;
     for stream in streams {

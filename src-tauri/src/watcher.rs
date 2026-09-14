@@ -12,9 +12,9 @@ pub fn spawn(app: AppHandle, db_path: PathBuf) {
         thread::sleep(Duration::from_secs(20));
         loop {
             let minutes = {
-                match db::open_migrated(&db_path).and_then(|conn| {
-                    db::load_settings(&conn).map_err(crate::error::AppError::from)
-                }) {
+                match db::open_migrated(&db_path)
+                    .and_then(|conn| db::load_settings(&conn).map_err(crate::error::AppError::from))
+                {
                     Ok(settings) => settings.library_check_minutes,
                     Err(err) => {
                         eprintln!("neolingua-center: watcher settings read failed: {err}");

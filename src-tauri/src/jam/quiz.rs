@@ -3,9 +3,9 @@
 use super::peers::{answer_key, broadcast_all, companions, score_key, send_text};
 use super::registry::{create_code, now_ms, JamRegistry, SessionHandle};
 use super::types::{
-    CommandOut, GapResult, JamPhase, JamRole, LeaderboardEntry, Peer, PlayerScore,
-    QuizGapInput, QuizProgressMessage, QuizProposeMsg, QuizRound, QuizStartMessage,
-    QuizStatus, Session, ToastMessage, QUIZ_RESUME_COUNTDOWN_MS, SECONDS_PER_GAP,
+    CommandOut, GapResult, JamPhase, JamRole, LeaderboardEntry, Peer, PlayerScore, QuizGapInput,
+    QuizProgressMessage, QuizProposeMsg, QuizRound, QuizStartMessage, QuizStatus, Session,
+    ToastMessage, QUIZ_RESUME_COUNTDOWN_MS, SECONDS_PER_GAP,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,7 +30,10 @@ fn normalize_answer(value: &str) -> String {
         .collect()
 }
 
-pub(super) fn grade_answers(round: &QuizRound, answers: &HashMap<String, String>) -> Vec<GapResult> {
+pub(super) fn grade_answers(
+    round: &QuizRound,
+    answers: &HashMap<String, String>,
+) -> Vec<GapResult> {
     round
         .gaps
         .iter()
@@ -107,13 +110,9 @@ pub(super) fn record_round_answer(
         let correct_count = results.iter().filter(|r| r.correct).count() as i64;
         let wrong_count = results.len() as i64 - correct_count;
         let key = answer_key(peer).to_string();
-        round.answers.insert(
-            key,
-            RoundAnswer {
-                answers,
-                timed_out,
-            },
-        );
+        round
+            .answers
+            .insert(key, RoundAnswer { answers, timed_out });
         (results, correct_count, wrong_count, response_ms)
     };
     credit_round_score(
@@ -236,7 +235,10 @@ fn finish_quiz_and_play(session: &mut Session) {
     );
 }
 
-pub(super) async fn begin_quiz_resume_countdown(registry: &Arc<JamRegistry>, handle: &SessionHandle) {
+pub(super) async fn begin_quiz_resume_countdown(
+    registry: &Arc<JamRegistry>,
+    handle: &SessionHandle,
+) {
     let mut session = handle.lock().await;
     let round_id = {
         let Some(round) = session.quiz.as_mut() else {
@@ -314,7 +316,11 @@ pub(super) async fn maybe_complete_quiz(registry: &Arc<JamRegistry>, handle: &Se
     begin_quiz_resume_countdown(registry, handle).await;
 }
 
-pub(super) async fn start_quiz(registry: &Arc<JamRegistry>, handle: &SessionHandle, msg: QuizProposeMsg) {
+pub(super) async fn start_quiz(
+    registry: &Arc<JamRegistry>,
+    handle: &SessionHandle,
+    msg: QuizProposeMsg,
+) {
     let mut session = handle.lock().await;
     if !session.state.quiz_mode {
         return;

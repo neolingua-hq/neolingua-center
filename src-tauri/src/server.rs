@@ -392,7 +392,10 @@ async fn jam_create_session(
         .quiz_interval_seconds
         .filter(|v| v.is_finite())
         .unwrap_or(60.0);
-    let created = state.jam.create_session(quiz_mode, quiz_interval_seconds).await;
+    let created = state
+        .jam
+        .create_session(quiz_mode, quiz_interval_seconds)
+        .await;
     (StatusCode::CREATED, Json(created))
 }
 
@@ -564,10 +567,7 @@ async fn subtitles_vtt(
 
 fn status_from_prep(path: &str, prep: &EpisodePrep) -> StatusBody {
     // Prefer job phase over on-disk video: remux may finish while Whisper is still running.
-    let video_status = if matches!(
-        prep.status,
-        PrepStatus::Processing | PrepStatus::Queued
-    ) {
+    let video_status = if matches!(prep.status, PrepStatus::Processing | PrepStatus::Queued) {
         "processing"
     } else if prep.status == PrepStatus::Error {
         "error"
@@ -590,11 +590,7 @@ fn status_from_prep(path: &str, prep: &EpisodePrep) -> StatusBody {
         .as_deref()
         .map(str::trim)
         .filter(|m| {
-            !m.is_empty()
-                && !matches!(
-                    prep.status,
-                    PrepStatus::Processing | PrepStatus::Queued
-                )
+            !m.is_empty() && !matches!(prep.status, PrepStatus::Processing | PrepStatus::Queued)
         })
         .unwrap_or(default_message);
     StatusBody {
@@ -691,10 +687,7 @@ async fn stream_file(
         let headers_mut = response.headers_mut();
         headers_mut.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
         headers_mut.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
-        headers_mut.insert(
-            header::CONTENT_LENGTH,
-            header_value_u64(take)?,
-        );
+        headers_mut.insert(header::CONTENT_LENGTH, header_value_u64(take)?);
         headers_mut.insert(
             header::CONTENT_RANGE,
             HeaderValue::from_str(&format!("bytes {start}-{end}/{file_size}")).map_err(|_| {

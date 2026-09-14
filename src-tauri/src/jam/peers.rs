@@ -1,10 +1,13 @@
 //! Peer management: attach, detach, broadcast, admin assignment.
 
-use super::quiz::{build_leaderboard, clear_quiz_timers, ensure_score, maybe_complete_quiz, sync_quiz_state_to_peer};
+use super::quiz::{
+    build_leaderboard, clear_quiz_timers, ensure_score, maybe_complete_quiz,
+    sync_quiz_state_to_peer,
+};
 use super::registry::{now_ms, JamRegistry, SessionHandle};
 use super::types::{
-    CommandOut, JamEndedMessage, JamPhase, JamRole, Peer, PeersMessage, QuizStatus,
-    Session, StateMessage, ToastMessage, LAUNCH_COUNTDOWN_SECONDS, RECONNECT_GRACE_MS,
+    CommandOut, JamEndedMessage, JamPhase, JamRole, Peer, PeersMessage, QuizStatus, Session,
+    StateMessage, ToastMessage, LAUNCH_COUNTDOWN_SECONDS, RECONNECT_GRACE_MS,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -333,7 +336,11 @@ pub(super) fn replace_peer_socket(
     }
 }
 
-pub(super) async fn soft_detach_peer(registry: &Arc<JamRegistry>, handle: &SessionHandle, peer_id: &str) {
+pub(super) async fn soft_detach_peer(
+    registry: &Arc<JamRegistry>,
+    handle: &SessionHandle,
+    peer_id: &str,
+) {
     let mut session = handle.lock().await;
     let Some(peer) = session.peers.iter_mut().find(|p| p.id == peer_id) else {
         return;
@@ -412,7 +419,11 @@ pub(super) async fn purge_peer(registry: &Arc<JamRegistry>, handle: &SessionHand
     }
 }
 
-pub(super) async fn start_launch_countdown(registry: &Arc<JamRegistry>, handle: &SessionHandle, by: String) {
+pub(super) async fn start_launch_countdown(
+    registry: &Arc<JamRegistry>,
+    handle: &SessionHandle,
+    by: String,
+) {
     let mut session = handle.lock().await;
     if session.state.phase != JamPhase::Lobby {
         return;

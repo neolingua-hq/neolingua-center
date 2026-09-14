@@ -1,18 +1,16 @@
 //! WebSocket handler for the Jam protocol.
 
 use super::peers::{
-    answer_key, attach_peer, broadcast, broadcast_all, companions, end_jam,
-    normalize_client_id, replace_peer_socket, soft_detach_peer, start_launch_countdown,
-    state_message,
+    answer_key, attach_peer, broadcast, broadcast_all, companions, end_jam, normalize_client_id,
+    replace_peer_socket, soft_detach_peer, start_launch_countdown, state_message,
 };
 use super::quiz::{
-    clear_quiz_timers, maybe_complete_quiz, quiz_progress_payload,
-    record_round_answer, start_quiz,
+    clear_quiz_timers, maybe_complete_quiz, quiz_progress_payload, record_round_answer, start_quiz,
 };
 use super::registry::{now_ms, JamRegistry, SessionHandle};
 use super::types::{
-    ClientMessage, CommandOut, JamPhase, JamRole, JamWsQuery, Peer, QuizProposeMsg,
-    QuizStatus, ToastMessage,
+    ClientMessage, CommandOut, JamPhase, JamRole, JamWsQuery, Peer, QuizProposeMsg, QuizStatus,
+    ToastMessage,
 };
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};

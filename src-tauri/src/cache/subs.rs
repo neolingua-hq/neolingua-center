@@ -12,8 +12,7 @@ use super::ffmpeg::{
 };
 use super::registry::PrepRegistry;
 use super::types::{
-    inspect_disk, load_sources_file, sub_cache_path, write_sub_source, EpisodePrep,
-    SubTrackSource,
+    inspect_disk, load_sources_file, sub_cache_path, write_sub_source, EpisodePrep, SubTrackSource,
 };
 
 fn whisper_cli_bin() -> Result<&'static Path, String> {
@@ -83,7 +82,11 @@ pub(super) fn convert_sub_to_vtt(source: &Path, out: &Path) -> Result<(), String
     Ok(())
 }
 
-pub(super) fn extract_embedded_sub(source: &Path, out: &Path, stream_index: usize) -> Result<(), String> {
+pub(super) fn extract_embedded_sub(
+    source: &Path,
+    out: &Path,
+    stream_index: usize,
+) -> Result<(), String> {
     let tmp = out.with_extension("partial.vtt");
     run_ffmpeg(&[
         "-y",
@@ -308,20 +311,35 @@ where
             recorded.en.as_deref()
         };
         if existing.is_none() {
-            write_sub_source(&registry.cache_dir, media_path, lang, SubTrackSource::Native);
+            write_sub_source(
+                &registry.cache_dir,
+                media_path,
+                lang,
+                SubTrackSource::Native,
+            );
         }
         return Ok(());
     }
 
     if let Some(sidecar) = find_sidecar_sub(source, lang) {
         convert_sub_to_vtt(&sidecar, &out)?;
-        write_sub_source(&registry.cache_dir, media_path, lang, SubTrackSource::Native);
+        write_sub_source(
+            &registry.cache_dir,
+            media_path,
+            lang,
+            SubTrackSource::Native,
+        );
         return Ok(());
     }
 
     if let Some(index) = probe_subtitle_index(source, lang)? {
         extract_embedded_sub(source, &out, index)?;
-        write_sub_source(&registry.cache_dir, media_path, lang, SubTrackSource::Native);
+        write_sub_source(
+            &registry.cache_dir,
+            media_path,
+            lang,
+            SubTrackSource::Native,
+        );
         return Ok(());
     }
 
@@ -347,7 +365,12 @@ where
         );
         registry.ensure_not_cancelled(media_path)?;
         transcribe_with_whisper(registry, media_path, source, &out, lang, on_update)?;
-        write_sub_source(&registry.cache_dir, media_path, lang, SubTrackSource::Generated);
+        write_sub_source(
+            &registry.cache_dir,
+            media_path,
+            lang,
+            SubTrackSource::Generated,
+        );
         return Ok(());
     }
 

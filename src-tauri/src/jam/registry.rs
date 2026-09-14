@@ -64,7 +64,11 @@ impl JamRegistry {
         }
     }
 
-    pub async fn create_session(&self, quiz_mode: bool, quiz_interval_seconds: f64) -> SessionPublic {
+    pub async fn create_session(
+        &self,
+        quiz_mode: bool,
+        quiz_interval_seconds: f64,
+    ) -> SessionPublic {
         let mut map = self.sessions.lock().await;
         let mut id = create_code(4);
         while map.contains_key(&id) {

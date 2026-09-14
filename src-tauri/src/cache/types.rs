@@ -68,7 +68,11 @@ impl Default for EpisodePrep {
 }
 
 impl EpisodePrep {
-    pub(super) fn from_tracks(video: bool, en_source: SubTrackSource, fr_source: SubTrackSource) -> Self {
+    pub(super) fn from_tracks(
+        video: bool,
+        en_source: SubTrackSource,
+        fr_source: SubTrackSource,
+    ) -> Self {
         let subs_en = en_source != SubTrackSource::Missing;
         let subs_fr = fr_source != SubTrackSource::Missing;
         let status = if video && subs_en && subs_fr {
@@ -155,7 +159,12 @@ pub(super) fn load_sources_file(cache_dir: &Path, media_path: &str) -> SubSource
     serde_json::from_str(&raw).unwrap_or_default()
 }
 
-pub(super) fn write_sub_source(cache_dir: &Path, media_path: &str, lang: &str, source: SubTrackSource) {
+pub(super) fn write_sub_source(
+    cache_dir: &Path,
+    media_path: &str,
+    lang: &str,
+    source: SubTrackSource,
+) {
     let mut file = load_sources_file(cache_dir, media_path);
     match lang {
         "fr" => file.fr = Some(source.as_str().into()),
