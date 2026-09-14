@@ -371,7 +371,7 @@ async function api(path, options) {
   let res;
   try {
     res = await fetch(path, {
-      headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
+      headers: { "Content-Type": "application/json", ...options?.headers },
       ...options,
     });
   } catch (err) {
@@ -2094,7 +2094,7 @@ async function boot(opts = {}) {
     bindBrandHome();
     render();
     syncPresenceWithNav();
-  } catch (err) {
+  } catch {
     reportConnectionLost();
     if (!opts.fromReconnect || catalog == null) {
       main.innerHTML = `<p class="muted">Impossible de joindre le serveur.</p>`;

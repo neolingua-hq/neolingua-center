@@ -20,6 +20,10 @@
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "quality": "bash scripts/quality.sh",
+    "lint": "npm run lint:ts && npm run lint:rs",
+    "lint:ts": "tsc --noEmit && oxlint --deny-warnings src vite.config.ts scripts src-tauri/viewer",
+    "lint:rs": "node scripts/lint-rs.mjs fmt-check && node scripts/lint-rs.mjs clippy",
+    "prepare": "husky",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -32,6 +36,9 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.0",
+    "oxlint": "^1.28.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^5.0.0"
