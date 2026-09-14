@@ -1,6 +1,7 @@
 use if_addrs::{get_if_addrs, IfAddr};
 use serde::Serialize;
 use std::net::Ipv4Addr;
+#[cfg(not(windows))]
 use std::process::Command;
 
 #[derive(Debug, Clone, Serialize)]
