@@ -143,7 +143,6 @@ let clockReceivedAt = performance.now();
 let clockPollTimer = null;
 let toastTimer = null;
 let countdownTimer = null;
-let applyingRemote = false;
 let displayPlayer = null;
 let wsGeneration = 0;
 let audioCtx = null;
@@ -167,8 +166,6 @@ let quizTimerInterval = null;
 let quizCountdownInterval = null;
 let quizModeEnabled = false;
 let quizIntervalSeconds = 60;
-/** True after admin Launch while waiting for the TV tap (fullscreen gesture). */
-let launchArmed = false;
 /** @type {{ start: number, end: number, text: string, tokens: object[] }[]} */
 let quizCues = [];
 /** @type {{ cueStart: number, cueEnd: number, gapTokenIndexes: number[], proposal: object }[]} */
@@ -1095,16 +1092,11 @@ async function beginDisplayPlayback() {
     await prepareEpisodeInBackground(player);
   }
 
-  applyingRemote = true;
+  player.currentTime = 0;
   try {
-    player.currentTime = 0;
-    try {
-      await player.play();
-    } catch {
-      setSessionStatus("Autoplay bloqué : appuie sur Play sur un téléphone", "error");
-    }
-  } finally {
-    applyingRemote = false;
+    await player.play();
+  } catch {
+    setSessionStatus("Autoplay bloqué : appuie sur Play sur un téléphone", "error");
   }
 
   broadcastClock(player);
@@ -1116,40 +1108,33 @@ async function applyDisplayCommand(msg) {
   if (!player?.src) return;
   if (jamPhase !== "playing" && jamPhase !== "quiz") return;
 
-  applyingRemote = true;
-  try {
-    if (msg.action === "seekBy" && typeof msg.delta === "number") {
-      if (jamPhase === "quiz") return;
-      player.currentTime = Math.max(
-        0,
-        Math.min(player.duration || Infinity, (player.currentTime || 0) + msg.delta),
-      );
-    } else if (msg.action === "seek") {
-      if (jamPhase === "quiz") return;
-      player.currentTime = msg.t;
-    } else if (msg.action === "play" || (msg.action === "toggle" && msg.playing)) {
-      try {
-        await player.play();
-      } catch {
-        /* ignore */
-      }
-    } else if (msg.action === "pause" || (msg.action === "toggle" && !msg.playing)) {
-      player.pause();
+  if (msg.action === "seekBy" && typeof msg.delta === "number") {
+    if (jamPhase === "quiz") return;
+    player.currentTime = Math.max(
+      0,
+      Math.min(player.duration || Infinity, (player.currentTime || 0) + msg.delta),
+    );
+  } else if (msg.action === "seek") {
+    if (jamPhase === "quiz") return;
+    player.currentTime = msg.t;
+  } else if (msg.action === "play" || (msg.action === "toggle" && msg.playing)) {
+    try {
+      await player.play();
+    } catch {
+      /* ignore */
     }
-
-    if (
-      (msg.action === "play" || msg.action === "pause" || msg.action === "toggle") &&
-      Math.abs((player.currentTime || 0) - msg.t) > 0.6
-    ) {
-      player.currentTime = msg.t;
-    }
-
-    if (jamPhase === "playing") broadcastClock(player);
-  } finally {
-    window.setTimeout(() => {
-      applyingRemote = false;
-    }, 50);
+  } else if (msg.action === "pause" || (msg.action === "toggle" && !msg.playing)) {
+    player.pause();
   }
+
+  if (
+    (msg.action === "play" || msg.action === "pause" || msg.action === "toggle") &&
+    Math.abs((player.currentTime || 0) - msg.t) > 0.6
+  ) {
+    player.currentTime = msg.t;
+  }
+
+  if (jamPhase === "playing") broadcastClock(player);
 }
 
 async function loadCompanionEpisode(episodePath) {
@@ -1406,30 +1391,6 @@ function playTick(high = false) {
   osc.stop(now + 0.08);
 }
 
-async function buildJoinUrl(code) {
-  const path = `/jam.html?s=${encodeURIComponent(code)}`;
-  const host = window.location.hostname;
-  const isLoopback = host === "localhost" || host === "127.0.0.1";
-
-  if (!isLoopback) {
-    return new URL(path, window.location.origin).toString();
-  }
-
-  try {
-    const info = await api("/api/jam/info");
-    const lan = info.addresses?.[0];
-    if (lan) {
-      const port = window.location.port;
-      const portPart = port ? `:${port}` : "";
-      return `${window.location.protocol}//${lan}${portPart}${path}`;
-    }
-  } catch {
-    // fallback
-  }
-
-  return new URL(path, window.location.origin).toString();
-}
-
 function isPlaybackReady(status) {
   return status?.video?.status === "ready" && status?.subtitles?.status !== "missing";
 }
@@ -1493,7 +1454,7 @@ function setSessionStatus(message, tone) {
 
 async function api(path, options) {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
+      headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
   });
   const data = await res.json().catch(() => ({}));

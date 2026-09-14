@@ -45,12 +45,13 @@ persistés dans SQLite :
 | `npm test` | Tests unitaires (Vitest + `cargo test`) |
 | `npm run test:unit` | Vitest seul |
 | `npm run test:rust` | Tests Rust (`src-tauri`) |
-| `npm run quality` | tsc, Clippy, tests |
+| `npm run lint` | tsc, oxlint (Vite/TS), rustfmt, Clippy |
+| `npm run quality` | lint + tests |
 
-Outils Clippy (une fois) :
+Outils Rust (une fois) :
 
 ```bash
-rustup component add clippy
+rustup component add rustfmt clippy
 ```
 
 ## Licence et source

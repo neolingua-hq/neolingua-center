@@ -14,14 +14,21 @@ Au premier lancement, `ffmpeg`, `ffprobe` et `whisper-cli` sont téléchargés
 dans `src-tauri/binaries/` (gitignorés). Ne les commite pas. Ne commite pas
 non plus `ggml-small.bin` ni quoi que ce soit sous `.secrets/`.
 
+`npm install` installe le hook git pre-commit (husky). Il lance rustfmt +
+Clippy sur les `.rs` stagés, et `tsc` + oxlint sur le front Vite / TypeScript
+(et le JS du viewer, hors `*.min.js`). Clippy a besoin des sidecars :
+`npm run fetch-binaries` une fois.
+
 ## Tests
 
 ```bash
 npm test
+npm run lint
 npm run quality
 ```
 
-`quality` lance `tsc`, Clippy et les tests.
+`lint` : tsc, oxlint, rustfmt `--check`, Clippy (`-D warnings`).
+`quality` : lint + tests.
 
 ## Secrets
 

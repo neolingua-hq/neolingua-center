@@ -254,7 +254,7 @@ fn persist_server_port(db_path: &PathBuf, port: u16) {
 }
 
 async fn bind_lan_listener(preferred: u16) -> Result<(TcpListener, u16), String> {
-    let last = preferred.saturating_add(19).min(65535);
+    let last = preferred.saturating_add(19);
     let mut last_err = String::new();
     for candidate in preferred..=last {
         let addr = SocketAddr::from(([0, 0, 0, 0], candidate));

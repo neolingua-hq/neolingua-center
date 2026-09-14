@@ -84,12 +84,10 @@ impl EpisodePrep {
         } else {
             "missing"
         };
-        let message = if status == "missing" {
-            None
-        } else if status == "ready" {
-            None
-        } else {
+        let message = if status == "partial" {
             Some(constitution_message(en_source, fr_source))
+        } else {
+            None
         };
         Self {
             status: status.into(),

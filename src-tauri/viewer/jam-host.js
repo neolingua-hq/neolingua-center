@@ -49,11 +49,7 @@ export async function mountJamHost(opts) {
   let ws = null;
   let reconnectEnabled = true;
   let jamPhase = "lobby";
-  let adminName = null;
-  let clockT = 0;
-  let clockPlaying = false;
   let clockDuration = 0;
-  let clockReceivedAt = performance.now();
   let clockPollTimer = null;
   let countdownTimer = null;
   let applyingRemote = false;
@@ -327,7 +323,7 @@ export async function mountJamHost(opts) {
 
   async function api(apiPath, options) {
     const res = await fetch(apiPath, {
-      headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
+      headers: { "Content-Type": "application/json", ...options?.headers },
       ...options,
     });
     const data = await res.json().catch(() => ({}));
@@ -860,11 +856,8 @@ export async function mountJamHost(opts) {
     }
   }
 
-  function applyClock(t, playing, duration) {
-    clockT = t;
-    clockPlaying = playing;
+  function applyClock(_t, _playing, duration) {
     if (duration > 0) clockDuration = duration;
-    clockReceivedAt = performance.now();
   }
 
   async function applyDisplayCommand(msg) {
@@ -1091,7 +1084,6 @@ export async function mountJamHost(opts) {
     }
 
     if (msg.type === "peers") {
-      adminName = msg.adminName;
       companionCount = Number(msg.companions) || 0;
       peersEl.textContent =
         msg.companions === 0
@@ -1103,7 +1095,6 @@ export async function mountJamHost(opts) {
     }
 
     if (msg.type === "admin") {
-      adminName = msg.adminName;
       previewHintEl.textContent = msg.adminName
         ? `Admin : ${msg.adminName} · en attente du lancement`
         : "En attente que quelqu'un rejoigne (premier = admin)";
@@ -1128,7 +1119,6 @@ export async function mountJamHost(opts) {
     if (msg.type === "state") {
       const prevPhase = jamPhase;
       jamPhase = msg.phase;
-      adminName = msg.adminName;
       if (typeof msg.quizMode === "boolean") {
         quizModeEnabled = msg.quizMode;
       }

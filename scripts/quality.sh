@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Typecheck, Clippy, and unit tests. Run from the repo root via `npm run quality`.
+# Typecheck, oxlint, rustfmt, Clippy, and unit tests.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,5 +11,7 @@ if [[ ! -d node_modules ]]; then
 fi
 
 npx --no-install tsc --noEmit
-(cd src-tauri && cargo clippy)
+npx --no-install oxlint --deny-warnings src vite.config.ts scripts src-tauri/viewer
+node scripts/lint-rs.mjs fmt-check
+node scripts/lint-rs.mjs clippy
 npm test

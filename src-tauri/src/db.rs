@@ -1,6 +1,6 @@
 use crate::scan::{CatalogMovie, CatalogSeason, CatalogSeries, CatalogSnapshot};
 use rusqlite::{params, Connection, OptionalExtension};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 /// Target schema version after migrations have run (single baseline).
@@ -238,10 +238,10 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-fn remove_db_files(path: &PathBuf) -> Result<(), String> {
+fn remove_db_files(path: &Path) -> Result<(), String> {
     for suffix in ["", "-wal", "-shm"] {
         let candidate = if suffix.is_empty() {
-            path.clone()
+            path.to_path_buf()
         } else {
             PathBuf::from(format!("{}{suffix}", path.display()))
         };
