@@ -53,7 +53,7 @@ export function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-export { escapeHtml, safeMediaUrl, slugify } from "./shared/html";
+export { escapeHtml } from "./shared/html";
 
 /** Map plugin / network failures to short French copy (no stack traces). */
 export function friendlyUpdateError(err: unknown): string {

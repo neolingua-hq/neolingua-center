@@ -113,27 +113,6 @@ async fn scan_catalog(
 }
 
 #[tauri::command]
-async fn check_library(
-    app: AppHandle,
-    state: State<'_, Mutex<DbState>>,
-    prep: State<'_, Arc<PrepRegistry>>,
-) -> Result<CatalogSnapshot, String> {
-    let path = {
-        let db = state.lock().map_err(|e| e.to_string())?;
-        db.path.clone()
-    };
-    let (mut snap, changed) =
-        tauri::async_runtime::spawn_blocking(move || library::sync_catalog_at(&path, false))
-            .await
-            .map_err(|e| e.to_string())??;
-    enrich_prep(&mut snap, &prep);
-    if changed {
-        let _ = app.emit("library-updated", ());
-    }
-    Ok(snap)
-}
-
-#[tauri::command]
 async fn prepare_episode(
     path: String,
     prep: State<'_, Arc<PrepRegistry>>,
@@ -357,7 +336,6 @@ pub fn run() {
             stop_lan_server,
             get_catalog,
             scan_catalog,
-            check_library,
             prepare_episode,
             prepare_episodes,
             cancel_prepare,

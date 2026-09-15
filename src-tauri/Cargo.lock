@@ -2593,7 +2593,6 @@ dependencies = [
 name = "neolingua-center"
 version = "1.0.0-beta.4"
 dependencies = [
- "anyhow",
  "axum",
  "futures",
  "if-addrs",

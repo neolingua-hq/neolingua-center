@@ -170,8 +170,6 @@ export function normalizeSettings(raw: AppSettings): AppSettings {
 
 const QUIZ_INTERVALS = [30, 60, 120, 300, 900] as const;
 
-export { QUIZ_INTERVALS };
-
 export function normalizeQuizInterval(raw: unknown): number {
   const value = Number(raw);
   if (QUIZ_INTERVALS.some((seconds) => seconds === value)) return value;
