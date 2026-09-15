@@ -107,10 +107,6 @@ export function cancelScheduledUpdate(): void {
   notifyUpdateState();
 }
 
-export function getPendingUpdate(): Update | null {
-  return pendingUpdate;
-}
-
 function bannerEl(): HTMLElement | null {
   return document.getElementById("update-banner");
 }
