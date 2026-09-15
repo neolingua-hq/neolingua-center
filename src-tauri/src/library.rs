@@ -376,8 +376,7 @@ pub fn sync_catalog(conn: &Connection, force: bool) -> Result<(CatalogSnapshot, 
 }
 
 pub fn sync_catalog_at(db_path: &PathBuf, force: bool) -> Result<(CatalogSnapshot, bool), String> {
-    let conn = db::open_connection(db_path)?;
-    db::run_migrations(&conn)?;
+    let conn = db::open_migrated(db_path)?;
     sync_catalog(&conn, force)
 }
 

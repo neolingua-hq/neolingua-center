@@ -60,6 +60,7 @@ import {
   pathForRoute as pathForRoutePure,
   routeFromPathname,
   routeFromSettings as routeFromSettingsPure,
+  safeMediaUrl,
   slugify,
   trackSourceTooltip,
 } from "./catalogLogic";
@@ -72,7 +73,10 @@ let networkInfo: NetworkInfo | null = null;
 let serverStatus: ServerStatus | null = null;
 let catalog: CatalogSnapshot | null = null;
 let catalogBusy = false;
+let catalogForcePending = false;
 let catalogError = "";
+/** Generation token to ignore stale async catalog results. */
+let catalogGeneration = 0;
 /** Live filter on the library home grid. */
 let librarySearchQuery = "";
 /** Deferred scan: folders chosen in the wizard, run when arriving at the library. */
@@ -81,6 +85,8 @@ let pendingCatalogScan = false;
 let presenceSessions: PresenceSession[] = [];
 let statusBarTimer: ReturnType<typeof setInterval> | null = null;
 const STATUS_BAR_POLL_MS = 2500;
+/** Prevent overlapping status bar refreshes. */
+let statusBarRefreshInFlight = false;
 let appVersion = "";
 
 let currentRoute: CenterRoute = { view: "setup", step: "welcome" };
@@ -382,12 +388,14 @@ function renderWizard(): void {
                   autocomplete="off"
                   spellcheck="false"
                   placeholder="Clé API"
-                  value="${escapeHtml(settings.tmdbApiKey ?? "")}"
+                  value=""
+                  data-has-saved-key="${settings.tmdbApiKey ? "true" : "false"}"
                 />
                 <button type="button" class="settings-key-toggle" id="tmdb-toggle-vis" aria-pressed="false">
                   Afficher
                 </button>
               </div>
+              ${settings.tmdbApiKey ? `<p class="settings-key-hint">Clé enregistrée (••••${escapeHtml(settings.tmdbApiKey.slice(-4))}). Videz le champ pour la supprimer.</p>` : ""}
             </div>
           </div>
         </section>
@@ -456,6 +464,16 @@ function renderWizard(): void {
     input.type = show ? "text" : "password";
     btn.textContent = show ? "Masquer" : "Afficher";
     btn.setAttribute("aria-pressed", show ? "true" : "false");
+  });
+
+  // Track if user explicitly clears the TMDB key field.
+  const tmdbInput = document.getElementById("tmdb-key") as HTMLInputElement | null;
+  tmdbInput?.addEventListener("input", () => {
+    if (tmdbInput.value.trim() === "" && tmdbInput.dataset.hasSavedKey === "true") {
+      tmdbInput.dataset.userCleared = "true";
+    } else {
+      delete tmdbInput.dataset.userCleared;
+    }
   });
 
   const jamQuiz = document.getElementById("opt-jam-quiz") as HTMLInputElement | null;
@@ -624,16 +642,23 @@ async function refreshPresence(): Promise<void> {
 }
 
 async function refreshStatusBar(): Promise<void> {
-  if (!networkInfo) {
-    try {
-      networkInfo = await loadNetworkInfo();
-    } catch {
-      networkInfo = null;
+  // Skip if a previous refresh is still in flight.
+  if (statusBarRefreshInFlight) return;
+  statusBarRefreshInFlight = true;
+  try {
+    if (!networkInfo) {
+      try {
+        networkInfo = await loadNetworkInfo();
+      } catch {
+        networkInfo = null;
+      }
     }
+    await refreshServerStatus();
+    await refreshPresence();
+    renderStatusBar();
+  } finally {
+    statusBarRefreshInFlight = false;
   }
-  await refreshServerStatus();
-  await refreshPresence();
-  renderStatusBar();
 }
 
 function ensureStatusBarLoop(): void {
@@ -871,8 +896,9 @@ function itemMatchesLibrarySearch(item: {
 }
 
 function posterMarkup(posterUrl: string | null | undefined, title: string): string {
-  if (posterUrl) {
-    return `<img class="poster-image" src="${escapeHtml(posterUrl)}" alt="" loading="lazy" />`;
+  const safeUrl = safeMediaUrl(posterUrl);
+  if (safeUrl) {
+    return `<img class="poster-image" src="${escapeHtml(safeUrl)}" alt="" loading="lazy" />`;
   }
   const letter = title.trim().slice(0, 1).toUpperCase() || "?";
   return `<div class="poster-fallback" aria-hidden="true"><span>${escapeHtml(letter)}</span></div>`;
@@ -1702,7 +1728,11 @@ function renderCurrentView(): void {
 }
 
 async function ensureCatalog(force = false): Promise<void> {
-  if (catalogBusy) return;
+  if (catalogBusy) {
+    // A force scan was requested while busy: defer it until the current scan completes.
+    if (force) catalogForcePending = true;
+    return;
+  }
   if (mediaRoots.length === 0) {
     catalog = { scannedAt: "", series: [], movies: [] };
     catalogError = "";
@@ -1715,18 +1745,31 @@ async function ensureCatalog(force = false): Promise<void> {
     }
   }
   catalogBusy = true;
+  catalogForcePending = false;
   catalogError = "";
+  const gen = ++catalogGeneration;
   renderCurrentView();
   try {
     catalog = await scanCatalog();
     // Re-read via best effort in case the invoke payload was incomplete.
-    await refreshCatalogIntoUi();
+    if (gen === catalogGeneration) {
+      await refreshCatalogIntoUi();
+    }
   } catch (err) {
-    catalogError = err instanceof Error ? err.message : String(err);
-    await refreshCatalogIntoUi();
+    if (gen === catalogGeneration) {
+      catalogError = err instanceof Error ? err.message : String(err);
+      await refreshCatalogIntoUi();
+    }
   } finally {
     catalogBusy = false;
-    renderCurrentView();
+    if (gen === catalogGeneration) {
+      renderCurrentView();
+    }
+    // If a force scan was requested while busy, run it now.
+    if (catalogForcePending) {
+      catalogForcePending = false;
+      void ensureCatalog(true);
+    }
   }
 }
 
@@ -1908,6 +1951,23 @@ function readOptionsFromDom(): void {
   const tmdb = document.getElementById("tmdb-key") as HTMLInputElement | null;
   const parsedGb = Number.parseInt(cacheMax?.value ?? "20", 10);
   const parsedInterval = Number.parseInt(jamQuizInterval?.value ?? "60", 10);
+
+  // TMDB key: if the input is empty and there was a saved key, keep it unless the user
+  // explicitly interacted with the field (dataset attribute tracks original state).
+  let nextTmdbKey = settings.tmdbApiKey;
+  if (tmdb) {
+    const inputValue = tmdb.value.trim();
+    const hadSavedKey = tmdb.dataset.hasSavedKey === "true";
+    if (inputValue) {
+      // User typed a new key
+      nextTmdbKey = inputValue;
+    } else if (hadSavedKey && tmdb.dataset.userCleared === "true") {
+      // User explicitly cleared the key
+      nextTmdbKey = "";
+    }
+    // Otherwise keep the existing key
+  }
+
   settings = {
     ...settings,
     skipIntro: skip?.checked ?? settings.skipIntro,
@@ -1917,7 +1977,7 @@ function readOptionsFromDom(): void {
     jamQuizIntervalSeconds: normalizeQuizInterval(parsedInterval),
     jamDisplaySubEn: jamDisplaySubEn?.checked ?? settings.jamDisplaySubEn,
     jamDisplaySubFr: jamDisplaySubFr?.checked ?? settings.jamDisplaySubFr,
-    tmdbApiKey: (tmdb?.value ?? settings.tmdbApiKey).trim(),
+    tmdbApiKey: nextTmdbKey,
   };
 }
 

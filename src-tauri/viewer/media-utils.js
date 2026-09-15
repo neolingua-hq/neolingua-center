@@ -26,14 +26,8 @@ export function formatClock(seconds) {
 /** Alias used by Solo / companion. */
 export const formatTime = formatClock;
 
-/** @param {unknown} text */
-export function escapeHtml(text) {
-  return String(text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+// Re-export escapeHtml from shared for backward compat
+export { escapeHtml, safeMediaUrl } from "./shared.js";
 
 /** @param {string} value */
 export function parseTs(value) {

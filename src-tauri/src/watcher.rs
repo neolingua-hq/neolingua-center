@@ -12,12 +12,14 @@ pub fn spawn(app: AppHandle, db_path: PathBuf) {
         thread::sleep(Duration::from_secs(20));
         loop {
             let minutes = {
-                match db::open_connection(&db_path).and_then(|conn| {
-                    db::run_migrations(&conn)?;
-                    db::load_settings(&conn)
-                }) {
+                match db::open_migrated(&db_path)
+                    .and_then(|conn| db::load_settings(&conn).map_err(crate::error::AppError::from))
+                {
                     Ok(settings) => settings.library_check_minutes,
-                    Err(_) => 60,
+                    Err(err) => {
+                        eprintln!("neolingua-center: watcher settings read failed: {err}");
+                        60
+                    }
                 }
             };
 
@@ -26,12 +28,14 @@ pub fn spawn(app: AppHandle, db_path: PathBuf) {
                 continue;
             }
 
-            let changed = library::sync_catalog_at(&db_path, false)
-                .map(|(_, changed)| changed)
-                .unwrap_or(false);
-
-            if changed {
-                let _ = app.emit("library-updated", ());
+            match library::sync_catalog_at(&db_path, false) {
+                Ok((_, true)) => {
+                    let _ = app.emit("library-updated", ());
+                }
+                Ok((_, false)) => {}
+                Err(err) => {
+                    eprintln!("neolingua-center: library sync failed: {err}");
+                }
             }
 
             let secs = u64::from(minutes.max(1)) * 60;
