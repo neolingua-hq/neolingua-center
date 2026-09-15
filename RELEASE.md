@@ -4,8 +4,11 @@ First install (marketing site) and in-app updates use **two different channels**
 
 | Channel | Destination | Artifacts |
 |---------|-------------|-----------|
-| Site / first install | R2 `download.neolingua.app` | macOS `.dmg`, Windows NSIS `.exe` |
+| Site / first install | https://center.neolingua.app/ (UI); R2 host `download.neolingua.app` | macOS `.dmg`, Windows NSIS `.exe` |
 | In-app updater | GitHub Releases + `latest.json` | `.app.tar.gz` (+ `.sig`), NSIS `.exe` (+ `.sig`) |
+
+The R2 hostname has no index page (root URL 404s). Point humans at the product
+site; use the full object URLs below for installers and the Whisper model.
 
 Details: [UPDATER.md](UPDATER.md).
 
@@ -38,7 +41,7 @@ A full release (macOS + Windows) therefore goes through
 single local `tauri build`. Local Mac builds are for smoke / `/Applications` only.
 
 Windows NSIS is **not** Authenticode-signed: SmartScreen may warn
-« unknown publisher ». macOS stays Developer ID + notarized. Only
+"Unknown publisher". macOS stays Developer ID + notarized. Only
 `TAURI_SIGNING_PRIVATE_KEY` is required for the updater (minisign) on both OS.
 
 ```bash

@@ -4,7 +4,7 @@
 
 | Channel | Role | Where |
 |---------|------|-------|
-| **First install** | Download buttons | Cloudflare R2 (`download.neolingua.app`) - see [RELEASE.md](RELEASE.md) |
+| **First install** | Product site + installers | https://center.neolingua.app/ (buttons); binaries on R2 at `download.neolingua.app/…` - see [RELEASE.md](RELEASE.md) |
 | **In-app updater** | Existing installs | GitHub Releases + static `latest.json` (this document) |
 
 Center uses the official Tauri updater plugin. Signed update artifacts are published
