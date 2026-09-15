@@ -2,6 +2,9 @@
 
 PRs target `develop`. One `feat/…`, `fix/…`, or `chore/…` branch per topic.
 
+Need Node.js 22.22+ (CI uses 24), Rust (`rustup`), and macOS or Windows.
+See [README.md](README.md) for the full prerequisites.
+
 ## Dev
 
 ```bash

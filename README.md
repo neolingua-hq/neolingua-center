@@ -3,13 +3,13 @@
 Home media host: local library, embedded LAN server, playback on TVs and
 browsers on your network. Free, [AGPL-3.0](LICENSE).
 
-Downloads: https://download.neolingua.app
+Product site and downloads: https://center.neolingua.app/
 
 The Neolingua name and logo remain trademarks. See [TRADEMARKS.md](TRADEMARKS.md).
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.22+ (CI uses 24)
 - Rust (`rustup`)
 - macOS or Windows
 
