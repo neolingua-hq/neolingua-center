@@ -32,7 +32,7 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 tauri-plugin-clipboard-manager = "2"
 tokio-util = { version = "0.7.19", features = ["io"] }
 tauri-plugin-process = "2.3.1"
-rand = "0.9"
+rand = "0.10"
 thiserror = "2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
