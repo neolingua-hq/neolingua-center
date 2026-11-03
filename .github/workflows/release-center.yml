@@ -118,7 +118,7 @@ jobs:
           path: src-tauri/target/**/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
-      - name: Upload Windows NSIS for R2
+      - name: Upload Windows NSIS for Authenticode
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v7
         with:
@@ -126,8 +126,134 @@ jobs:
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
 
-  publish-r2:
+  # Authenticode (Certum SimplySign) must run in an interactive Windows session
+  # where SimplySign Desktop is logged in. The self-hosted runner on titane
+  # must be started via run.cmd in that session (not as a Windows service).
+  # Wake the machine before tagging: wake-titane
+  sign-windows:
     needs: publish-center
+    if: ${{ always() && !cancelled() && github.repository == 'neolingua-hq/neolingua-center' }}
+    runs-on: [self-hosted, Windows, X64, signing]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download unsigned Windows NSIS
+        id: dl
+        uses: actions/download-artifact@v8
+        with:
+          name: installer-windows-x64
+          path: unsigned
+        continue-on-error: true
+
+      - name: Authenticode sign
+        if: steps.dl.outcome == 'success'
+        shell: pwsh
+        env:
+          CERTUM_CERT_SHA1: 1D3E06AABF499CAA5C3F3FF0D4263B26698F7C7D
+          CERTUM_TIMESTAMP: http://time.certum.pl
+        run: |
+          $exe = Get-ChildItem -Path unsigned -Recurse -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { throw 'No Windows NSIS .exe in artifact' }
+          Write-Host "Signing $($exe.FullName)"
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sign-windows-authenticode.ps1 -File $exe.FullName
+          New-Item -ItemType Directory -Force -Path signed | Out-Null
+          Copy-Item $exe.FullName "signed/$($exe.Name)"
+
+      - name: Upload signed Windows NSIS
+        if: steps.dl.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-windows-x64-signed
+          path: signed/*.exe
+          if-no-files-found: error
+
+      - name: Replace release asset with signed exe
+        if: steps.dl.outcome == 'success' && github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = Get-ChildItem signed -Filter *.exe | Select-Object -First 1
+          gh release upload "${{ github.ref_name }}" $exe.FullName --clobber --repo "${{ github.repository }}"
+
+  # Authenticode changes bytes: regenerate the Tauri updater .sig and patch latest.json.
+  resign-windows-updater:
+    needs: sign-windows
+    if: ${{ always() && !cancelled() && needs.sign-windows.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Download signed Windows NSIS
+        id: dl
+        uses: actions/download-artifact@v8
+        with:
+          name: installer-windows-x64-signed
+          path: signed
+        continue-on-error: true
+
+      - name: Regenerate updater .sig
+        id: sig
+        if: steps.dl.outcome == 'success'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/resign-windows-updater.sh
+          exe="$(find signed -type f -name '*.exe' | head -n 1)"
+          [[ -n "$exe" ]] || { echo "No signed exe"; exit 1; }
+          ./scripts/resign-windows-updater.sh "$exe"
+          echo "exe=$exe" >> "$GITHUB_OUTPUT"
+          echo "sig=${exe}.sig" >> "$GITHUB_OUTPUT"
+
+      - name: Upload .sig to GitHub Release
+        if: steps.sig.outcome == 'success' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ github.ref_name }}" "${{ steps.sig.outputs.sig }}" \
+            --clobber --repo "${{ github.repository }}"
+
+      - name: Patch latest.json Windows signature
+        if: steps.sig.outcome == 'success' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ github.ref_name }}" -p latest.json -O latest.json \
+            --repo "${{ github.repository }}"
+          SIG="$(tr -d '\n\r' < "${{ steps.sig.outputs.sig }}")"
+          export SIG
+          python3 - <<'PY'
+          import json, os
+          sig = os.environ["SIG"]
+          with open("latest.json", encoding="utf-8") as f:
+              data = json.load(f)
+          platforms = data.get("platforms") or {}
+          # Tauri platform keys for Windows NSIS
+          keys = [k for k in platforms if "windows" in k.lower()]
+          if not keys:
+              raise SystemExit(f"no windows platform in latest.json: {list(platforms)}")
+          for k in keys:
+              platforms[k]["signature"] = sig
+              print(f"patched {k}")
+          with open("latest.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          PY
+          gh release upload "${{ github.ref_name }}" latest.json \
+            --clobber --repo "${{ github.repository }}"
+
+  publish-r2:
+    needs: [publish-center, sign-windows]
     # Publish whatever installers succeeded (do not block on one matrix leg).
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -148,7 +274,7 @@ jobs:
           # Some matrix legs may have failed (no artifact for that OS).
         continue-on-error: true
 
-      - name: Pick macOS aarch64 DMG and Windows NSIS
+      - name: Pick macOS aarch64 DMG and Windows NSIS (prefer signed)
         id: pick
         shell: bash
         run: |
@@ -158,7 +284,11 @@ jobs:
           if [[ -z "$dmg" ]]; then
             dmg="$(find artifacts -type f -name '*.dmg' | head -n 1 || true)"
           fi
-          exe="$(find artifacts -type f -name '*.exe' | head -n 1 || true)"
+          # Prefer Authenticode-signed artifact when present
+          exe="$(find artifacts -path '*windows-x64-signed*' -type f -name '*.exe' | head -n 1 || true)"
+          if [[ -z "$exe" ]]; then
+            exe="$(find artifacts -type f -name '*.exe' | head -n 1 || true)"
+          fi
           echo "dmg=${dmg}" >> "$GITHUB_OUTPUT"
           echo "exe=${exe}" >> "$GITHUB_OUTPUT"
           [[ -n "$dmg" ]] || { echo "No DMG found"; exit 1; }

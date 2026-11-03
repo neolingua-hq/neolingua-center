@@ -83,11 +83,14 @@ npm run tauri build
 ## First install vs updater
 
 - **macOS**: Developer ID + notarization (Gatekeeper).
-- **Windows**: no Authenticode certificate yet. The CI NSIS build is unsigned;
-  SmartScreen may show "Unknown publisher" (More info -> Run anyway).
+- **Windows**: Authenticode via Certum SimplySign on the self-hosted runner
+  `titane` (after the GitHub-hosted NSIS build). SmartScreen reputation still
+  builds up over downloads even with a valid publisher name.
 
 The Tauri updater verifies minisign signatures of update payloads; it does not
-replace OS code-signing for first install.
+replace OS code-signing for first install. Because Authenticode changes the
+NSIS bytes, CI regenerates the Windows `.sig` and patches `latest.json` after
+signing (see `scripts/resign-windows-updater.sh`).
 
 ## Test checklist
 
