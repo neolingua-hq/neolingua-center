@@ -40,9 +40,13 @@ A full release (macOS + Windows) therefore goes through
 `.github/workflows/release-center.yml` (matrix `macos` + `windows-latest`), not a
 single local `tauri build`. Local Mac builds are for smoke / `/Applications` only.
 
-Windows NSIS is **not** Authenticode-signed: SmartScreen may warn
-"Unknown publisher". macOS stays Developer ID + notarized. Only
-`TAURI_SIGNING_PRIVATE_KEY` is required for the updater (minisign) on both OS.
+Windows NSIS is Authenticode-signed in CI on the self-hosted runner `titane`
+(Certum SimplySign). Wake the machine before tagging (`wake-titane`) and keep
+SimplySign Desktop logged in in an interactive session. After Authenticode,
+CI regenerates the updater `.sig` and patches `latest.json` (file bytes changed).
+
+macOS stays Developer ID + notarized. `TAURI_SIGNING_PRIVATE_KEY` is required
+for the updater (minisign) on both OS.
 
 ```bash
 export TAURI_SIGNING_PRIVATE_KEY="$(cat .secrets/neolingua-center.key)"
@@ -98,12 +102,17 @@ must be 487601967 bytes.
 
 1. Commit and push
 2. Tag `X.Y.Z` (or `1.0.0-beta.1`) matching the bumped version - no `v` prefix
-3. Workflow `.github/workflows/release-center.yml` builds platforms and uploads
-   `latest.json` via `tauri-action`
-4. The same workflow uploads `neolingua-latest.dmg` / `neolingua-latest.exe` to R2
-   and publishes `whisper/ggml-small.bin` if it is not already on the bucket
+3. Wake `titane` (`wake-titane`) so the self-hosted signing runner is online
+4. Workflow `.github/workflows/release-center.yml` builds platforms, uploads
+   `latest.json` via `tauri-action`, Authenticode-signs the Windows NSIS on
+   `titane`, re-signs the updater `.sig`, then publishes installers to R2
+5. The same workflow publishes `whisper/ggml-small.bin` if it is not already
+   on the bucket
 
 GitHub Actions secrets: `TAURI_SIGNING_PRIVATE_KEY`,
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Apple signing (`APPLE_*`,
 `KEYCHAIN_PASSWORD`), `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
 `R2_SECRET_ACCESS_KEY`. Values never belong in git.
+
+Self-hosted runner labels: `self-hosted`, `Windows`, `X64`, `signing`.
+See [WINDOWS-SIGNING.md](WINDOWS-SIGNING.md).
