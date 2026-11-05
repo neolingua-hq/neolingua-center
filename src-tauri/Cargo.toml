@@ -1,6 +1,6 @@
 [package]
 name = "neolingua-center"
-version = "1.0.0-beta.5"
+version = "1.0.0"
 description = "Neolingua Center - family host"
 authors = ["Martin Catty"]
 license = "AGPL-3.0-only"
