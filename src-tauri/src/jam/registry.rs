@@ -21,7 +21,7 @@ pub(super) fn now_ms() -> i64 {
 
 pub(super) fn create_code(length: usize) -> String {
     let mut rng = rand::rng();
-    use rand::Rng;
+    use rand::RngExt;
     (0..length)
         .map(|_| {
             let idx = rng.random_range(0..CODE_ALPHABET.len());
