@@ -265,29 +265,37 @@ jobs:
         with:
           node-version: 24
 
-      - name: Download installers
+      - name: Download macOS installers
         uses: actions/download-artifact@v8
         with:
-          pattern: installer-*
-          path: artifacts
+          pattern: installer-macos-*
+          path: artifacts/macos
           merge-multiple: true
           # Some matrix legs may have failed (no artifact for that OS).
         continue-on-error: true
 
-      - name: Pick macOS aarch64 DMG and Windows NSIS (prefer signed)
+      # Signed and unsigned NSIS share the same file name: never merge them.
+      # Only the Authenticode-signed artifact may reach R2.
+      - name: Download Authenticode-signed Windows NSIS
+        if: ${{ needs.sign-windows.result == 'success' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: installer-windows-x64-signed
+          path: artifacts/windows-signed
+
+      - name: Pick macOS aarch64 DMG and signed Windows NSIS
         id: pick
         shell: bash
         run: |
           set -euo pipefail
           find artifacts -type f | sort
-          dmg="$(find artifacts -type f -name '*.dmg' | grep -E 'aarch64|arm64' | head -n 1 || true)"
+          dmg="$(find artifacts/macos -type f -name '*.dmg' 2>/dev/null | grep -E 'aarch64|arm64' | head -n 1 || true)"
           if [[ -z "$dmg" ]]; then
-            dmg="$(find artifacts -type f -name '*.dmg' | head -n 1 || true)"
+            dmg="$(find artifacts/macos -type f -name '*.dmg' 2>/dev/null | head -n 1 || true)"
           fi
-          # Prefer Authenticode-signed artifact when present
-          exe="$(find artifacts -path '*windows-x64-signed*' -type f -name '*.exe' | head -n 1 || true)"
+          exe="$(find artifacts/windows-signed -type f -name '*.exe' 2>/dev/null | head -n 1 || true)"
           if [[ -z "$exe" ]]; then
-            exe="$(find artifacts -type f -name '*.exe' | head -n 1 || true)"
+            echo "::warning::No Authenticode-signed Windows installer (sign-windows: ${{ needs.sign-windows.result }}). Windows R2 object left unchanged."
           fi
           echo "dmg=${dmg}" >> "$GITHUB_OUTPUT"
           echo "exe=${exe}" >> "$GITHUB_OUTPUT"
