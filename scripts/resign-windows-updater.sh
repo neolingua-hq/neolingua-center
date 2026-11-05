@@ -25,7 +25,10 @@ fi
 
 : "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:=}"
 
-npx --yes @tauri-apps/cli@2 signer sign -f "$exe"
+# CLI v2: <FILE> is positional; -f is --private-key-path (do not pass -f for the exe).
+# Key + password come from TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
+unset TAURI_SIGNING_PRIVATE_KEY_PATH || true
+npx --yes @tauri-apps/cli@2 signer sign "$exe"
 sig="${exe}.sig"
 if [[ ! -f "$sig" ]]; then
   echo "expected signature at $sig" >&2
