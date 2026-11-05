@@ -59,7 +59,8 @@ See [RELEASE.md](RELEASE.md) for the full checklist (R2 first-install + GitHub u
    - macOS `x86_64`
    - Windows NSIS (setup `.exe` + `.sig`)
 4. `tauri-action` merges platforms into `latest.json` on the release.
-5. A follow-up job uploads `macos/neolingua-latest.dmg` and `windows/neolingua-latest.exe` to R2.
+5. A follow-up job uploads `macos/neolingua-latest.dmg` and `windows/neolingua-latest.exe` to R2
+   (Windows only when Authenticode signing succeeded).
 
 ## Manual local sign (optional)
 

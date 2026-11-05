@@ -11,7 +11,9 @@ Code Signing certificate via **SimplySign** (cloud key, not exportable).
    `signtool` + SimplySign Desktop.
 3. A follow-up GitHub-hosted job regenerates the Tauri updater `.sig` and
    patches `latest.json` (Authenticode changes file bytes).
-4. R2 publish prefers the signed artifact.
+4. R2 publish only uploads the signed artifact. If `sign-windows` fails, the
+   Windows R2 object is left unchanged; re-run the failed jobs once SimplySign
+   is logged in again.
 
 ## Machine prerequisites (titane)
 
